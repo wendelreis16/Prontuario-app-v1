@@ -585,11 +585,11 @@ const Extract = (() => {
     for (let i = 0; i < lines.length - 1; i++) {
       const a = String(lines[i].text || '').trim();
       const b = String(lines[i + 1].text || '').trim();
-      const labelInA = /e[-_\\s]?\\s?mail/i.test(a);
-      const looksSplit = labelInA || /[@©®&]\\s*$/.test(a) || /^@/.test(b) ||
-        (/[&©®Qq]\\s*$/.test(a) && /[A-Za-z0-9.-]+\\.[A-Za-z]{2,}/.test(b));
+      const labelInA = /e[-_\s]?\s?mail/i.test(a);
+      const looksSplit = labelInA || /[@©®&]\s*$/.test(a) || /^@/.test(b) ||
+        (/[&©®Qq]\s*$/.test(a) && /[A-Za-z0-9.-]+\.[A-Za-z]{2,}/.test(b));
       if (!looksSplit || !a || !b) continue;
-      const labelOnly = /e[-_\\s]?\\s?mail\\s*[:;.\\-]?\\s*$/.test(a);
+      const labelOnly = /e[-_\s]?\s?mail\s*[:;.\-]?\s*$/.test(a);
       const separator = labelOnly ? ' ' : '';
       emailSources.push({ line: lines[i], text: a + separator + b, joined: true });
     }
@@ -604,14 +604,14 @@ const Extract = (() => {
           existing.conf = conf;
           existing.bbox = src.line.bbox;
           existing.flags = flags;
-          existing.label = e.variant ? 'variante' : (/e[-_\\s]?\\s?mail/i.test(src.text) ? 'rótulo e-mail' : '');
+          existing.label = e.variant ? 'variante' : (/e[-_\s]?\s?mail/i.test(src.text) ? 'rótulo e-mail' : '');
         }
         return;
       }
       emails.push({
-        value, label: e.variant ? 'variante' : (/e[-_\\s]?\\s?mail/i.test(src.text) ? 'rótulo e-mail' : ''),
+        value, label: e.variant ? 'variante' : (/e[-_\s]?\s?mail/i.test(src.text) ? 'rótulo e-mail' : ''),
         conf, bbox: src.line.bbox, flags, variant: e.variant,
-        _priority: (/e[-_\\s]?\\s?mail/i.test(src.text) ? 100 : 0) + conf
+        _priority: (/e[-_\s]?\s?mail/i.test(src.text) ? 100 : 0) + conf
       });
     }));
     emails.sort((a, b) => b._priority - a._priority);
