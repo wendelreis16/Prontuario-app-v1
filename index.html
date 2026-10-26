@@ -433,7 +433,7 @@ const Extract = (() => {
     // linha rotulada "e-mail": o OCR troca "@" por "Q"/"&" e perde o "_" (vira espaço)
     const lm = text.match(/e[-_\s]?\s?mail\s*[:;.\-]?\s*(.+)$/i);
     if (lm && !/@/.test(lm[1])) {
-      const rest = lm[1].replace(/(?<=[A-Za-z0-9._\-\s])[&©®Qq](?=[A-Za-z0-9\-]+(?:\.[A-Za-z0-9\-]+)*\.[A-Za-z]{2,}\s*$)/, '@');
+      const rest = lm[1].replace(/(?<=[A-Za-z0-9._\-\s])[&©®Qq](?=\s*[A-Za-z0-9\-]+(?:\.[A-Za-z0-9\-]+)*\.[A-Za-z]{2,}\s*$)/, '@');
       if (/@/.test(rest)) {
         rebuilt = true;
         const at = rest.indexOf('@');
