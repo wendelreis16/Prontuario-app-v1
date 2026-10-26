@@ -1,0 +1,1339 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Piloto Prontuários — OCR Local v2</title>
+<style>
+:root{
+  --bg:#f5f7fa;--surface:#fff;--surface-2:#f1f4f8;--text:#0f172a;--muted:#5b6472;--border:#d8dee7;
+  --accent:#0f766e;--accent-d:#115e59;--on-accent:#fff;--accent-l:#e3f5f2;
+  --warn-bg:#fff6dc;--warn:#8a5a00;--warn-b:#f2d98a;
+  --bad-bg:#fdeceb;--bad:#b42318;--bad-b:#f3b4ae;
+  --ok-bg:#e6f6ec;--ok:#116b36;--ok-b:#a8dcbb;
+  --info-bg:#e9f1ff;--info:#1d4ed8;--info-b:#b7cdf7;
+  --hl:rgba(15,118,110,.28);--ln:rgba(30,64,175,.18);
+  --radius:10px;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#0e1217;--surface:#161b22;--surface-2:#1d242d;--text:#e8edf3;--muted:#9aa5b3;--border:#2b3440;
+  --accent:#2dd4bf;--accent-d:#5eead4;--on-accent:#04201d;--accent-l:#10302c;
+  --warn-bg:#33290c;--warn:#f5c451;--warn-b:#5c4a14;
+  --bad-bg:#3a1717;--bad:#ff9a90;--bad-b:#6b2a2a;
+  --ok-bg:#12301f;--ok:#6ee7a0;--ok-b:#245a39;
+  --info-bg:#14243f;--info:#8ab4ff;--info-b:#2b4a80;
+  --hl:rgba(45,212,191,.30);--ln:rgba(138,180,255,.22);
+}}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0}
+body{background:var(--bg);color:var(--text);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1280px;margin:0 auto;padding:0 20px}
+h1,h2,h3{margin:0;line-height:1.2}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.banner{background:#064e3b;color:#fff;font-size:13.5px;padding:9px 16px;text-align:center}
+.banner b{font-weight:650}
+header.top{display:flex;flex-wrap:wrap;gap:12px;justify-content:space-between;align-items:center;padding:18px 0 12px}
+header.top h1{font-size:22px}
+header.top p{margin:2px 0 0;color:var(--muted);font-size:14px}
+.engine{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;padding:3px 10px;border-radius:999px;background:var(--surface-2);border:1px solid var(--border);color:var(--muted)}
+.engine i{width:8px;height:8px;border-radius:50%;background:#94a3b8;display:inline-block}
+.engine.ready i{background:#16a34a}.engine.off i{background:#94a3b8}.engine.loading i{background:#f59e0b}.engine.error i{background:#dc2626}
+
+.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 13px;border-radius:8px;border:1px solid var(--border);background:var(--surface);cursor:pointer;font-weight:600;font-size:14px}
+.btn:hover{background:var(--surface-2)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.btn.primary:hover{background:var(--accent-d);border-color:var(--accent-d)}
+.btn.danger{color:var(--bad);border-color:var(--bad-b)}
+.btn.sm{padding:4px 9px;font-size:13px}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+
+nav.tabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:18px;overflow-x:auto}
+nav.tabs button{background:none;border:0;border-bottom:3px solid transparent;padding:10px 14px;cursor:pointer;font-weight:600;color:var(--muted);white-space:nowrap}
+nav.tabs button[aria-selected="true"]{color:var(--accent);border-bottom-color:var(--accent)}
+nav.tabs .count{background:var(--surface-2);border:1px solid var(--border);border-radius:999px;padding:0 7px;font-size:12px;margin-left:4px;color:var(--text)}
+
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px}
+.note{display:flex;gap:10px;border-radius:8px;padding:10px 12px;font-size:13.5px;margin-bottom:14px;border:1px solid}
+.note.warn{background:var(--warn-bg);color:var(--warn);border-color:var(--warn-b)}
+.note.info{background:var(--info-bg);color:var(--info);border-color:var(--info-b)}
+.note.bad{background:var(--bad-bg);color:var(--bad);border-color:var(--bad-b)}
+.muted{color:var(--muted)}
+.row{display:flex;gap:14px;flex-wrap:wrap;align-items:center}
+
+.settings{display:flex;flex-wrap:wrap;gap:18px;align-items:flex-end;margin-bottom:14px}
+.settings label{display:flex;flex-direction:column;gap:3px;font-size:13px;color:var(--muted)}
+.settings label.chk{flex-direction:row;align-items:center;gap:7px;color:var(--text)}
+.settings select,.settings input[type=text]{padding:6px 9px;border:1px solid var(--border);border-radius:7px;background:var(--surface)}
+
+.drop{position:relative;border:2px dashed var(--border);border-radius:12px;padding:30px 18px;text-align:center;background:var(--surface);transition:.15s}
+.drop.over,.drop:hover{border-color:var(--accent);background:var(--accent-l)}
+.drop input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.drop strong{display:block;font-size:16px;margin-bottom:3px}
+.queue{margin-top:14px;display:grid;gap:8px}
+.q{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 12px}
+.q .qh{display:flex;justify-content:space-between;gap:10px;font-size:13px}
+.q .qn{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bar{height:6px;background:var(--surface-2);border-radius:99px;margin-top:6px;overflow:hidden}
+.bar>div{height:100%;width:0;background:var(--accent);transition:width .15s}
+.q.err .bar>div{background:#dc2626}.q.done .bar>div{background:#16a34a}
+
+/* Review */
+.review-grid{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(340px,1fr);gap:16px;align-items:start}
+@media (max-width:960px){.review-grid{grid-template-columns:1fr}}
+.viewer{padding:0;overflow:hidden;position:sticky;top:8px}
+@media (max-width:960px){.viewer{position:static}}
+.vbar{display:flex;flex-wrap:wrap;gap:6px;padding:8px;border-bottom:1px solid var(--border);align-items:center;background:var(--surface-2)}
+.vbar .sp{flex:1}
+.vscroll{max-height:calc(100vh - 150px);min-height:340px;overflow:auto;background:#cfd6df}
+.stage{position:relative;margin:0 auto}
+.stage img{display:block;width:100%;height:auto;user-select:none}
+.ov{position:absolute;inset:0}
+.ov .b{position:absolute;border-radius:3px}
+.ov .b.ln{background:var(--ln);outline:1px solid rgba(30,64,175,.35);cursor:pointer}
+.ov .b.hl{background:var(--hl);outline:2px solid var(--accent);pointer-events:none}
+.form h2{font-size:17px}
+.fhead{display:flex;justify-content:space-between;gap:8px;align-items:flex-start;margin-bottom:10px}
+.fhead .fn{font-size:13px;color:var(--muted);word-break:break-all}
+.field{margin-bottom:12px}
+.field>label{display:flex;gap:8px;align-items:center;font-size:13px;font-weight:650;margin-bottom:3px}
+.field input,.field select{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:7px;background:var(--surface)}
+.field input.low{border-color:var(--warn-b);background:var(--warn-bg)}
+.field input.vlow{border-color:var(--bad-b);background:var(--bad-bg)}
+.hint{font-size:12px;color:var(--muted);min-height:0;margin-top:2px}
+.hint.w{color:var(--warn)}.hint.b{color:var(--bad)}
+.badge{font-size:11px;font-weight:650;padding:1px 8px;border-radius:99px;border:1px solid var(--border);background:var(--surface-2);color:var(--muted)}
+.badge.hi{background:var(--ok-bg);color:var(--ok);border-color:var(--ok-b)}
+.badge.mid{background:var(--warn-bg);color:var(--warn);border-color:var(--warn-b)}
+.badge.lo{background:var(--bad-bg);color:var(--bad);border-color:var(--bad-b)}
+.chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:5px}
+.chip{font-size:12px;padding:2px 8px;border-radius:6px;border:1px solid var(--info-b);background:var(--info-bg);color:var(--info);cursor:pointer}
+.chip small{opacity:.75}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media (max-width:520px){.two{grid-template-columns:1fr}}
+.fact{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.kbd{font-size:11px;border:1px solid currentColor;border-radius:4px;padding:0 5px;opacity:.85;font-weight:500}
+
+/* Base / metrics */
+.tools{display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between;align-items:center;margin-bottom:12px}
+.tools .l,.tools .r{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.tools input[type=search],.tools select{padding:6px 9px;border:1px solid var(--border);border-radius:7px;background:var(--surface)}
+.tbl{overflow-x:auto;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius)}
+table{border-collapse:collapse;width:100%;font-size:14px;min-width:860px}
+th{font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);text-align:left;background:var(--surface-2)}
+th,td{padding:9px 11px;border-bottom:1px solid var(--border);vertical-align:top}
+tbody tr:hover{background:var(--surface-2)}
+.st{font-size:12px;font-weight:650;padding:1px 8px;border-radius:99px}
+.st.pendente{background:var(--warn-bg);color:var(--warn)}.st.confirmado{background:var(--ok-bg);color:var(--ok)}.st.descartado{background:var(--surface-2);color:var(--muted)}
+.dup{font-size:11.5px;color:var(--bad);display:block}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:16px}
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px}
+.kpi .v{font-size:26px;font-weight:700;color:var(--accent)}
+.kpi .t{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:650}
+.kpi .s{font-size:12px;color:var(--muted)}
+.verdict{border-radius:10px;padding:12px 14px;margin-bottom:16px;font-weight:600;border:1px solid}
+.verdict.ok{background:var(--ok-bg);color:var(--ok);border-color:var(--ok-b)}
+.verdict.mid{background:var(--warn-bg);color:var(--warn);border-color:var(--warn-b)}
+.verdict.no{background:var(--surface-2);color:var(--muted);border-color:var(--border)}
+.empty{padding:36px 16px;text-align:center;color:var(--muted)}
+dialog{border:1px solid var(--border);border-radius:12px;background:var(--surface);color:var(--text);padding:20px;max-width:520px;width:calc(100% - 32px)}
+dialog::backdrop{background:rgba(10,15,25,.5)}
+dialog h3{margin-bottom:8px}
+dialog .mf{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
+dialog input[type=password]{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:7px;background:var(--surface);margin-top:6px}
+pre.raw{max-height:320px;overflow:auto;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:10px;font-size:12.5px;white-space:pre-wrap}
+footer{padding:22px 0 40px;color:var(--muted);font-size:12.5px}
+.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#0f172a;color:#fff;padding:9px 16px;border-radius:8px;font-size:14px;z-index:50;box-shadow:0 6px 20px rgba(0,0,0,.3)}
+</style>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0f766e">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<script>
+/* Pacote hospedado: o motor OCR e o idioma português vêm desta mesma pasta (sem CDN). */
+(function () { const u = p => new URL(p, location.href).href;
+  window.OCR_CONFIG = { scriptUrl: u('ocr/tesseract.min.js'), scriptIntegrity: '', workerPath: u('ocr/worker.min.js'), corePath: u('ocr/core'), langPath: u('ocr/lang') }; })();
+</script>
+</head>
+<body>
+
+<div class="banner" role="note">
+  <b>Nenhuma imagem ou texto de prontuário é enviado a servidores.</b>
+  O OCR roda neste aparelho, com o motor e o idioma português guardados no próprio app (sem CDN).
+</div>
+
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>Piloto Prontuários — extração de contatos</h1>
+      <p>OCR real (Tesseract) · revisão com a imagem ao lado · exportação segura · métricas do piloto</p>
+    </div>
+    <div class="row">
+      <span class="engine" id="engine"><i></i><span id="engine-txt">Motor OCR: baixa na 1ª análise</span></span>
+      <button type="button" class="engine" id="vault-chip" style="cursor:pointer" title="Salvamento automático criptografado"><i></i><span id="vault-txt">Salvamento: desligado</span></button>
+      <button class="btn" id="btn-sample" type="button" title="Gera um documento fictício e o analisa com o OCR real">Testar com documento fictício</button>
+    </div>
+  </header>
+
+  <nav class="tabs" role="tablist" aria-label="Etapas">
+    <button role="tab" id="t-capture" aria-selected="true" data-tab="capture">1 · Captura</button>
+    <button role="tab" id="t-review" aria-selected="false" data-tab="review">2 · Revisão <span class="count" id="n-pend">0</span></button>
+    <button role="tab" id="t-base" aria-selected="false" data-tab="base">3 · Base e exportação <span class="count" id="n-base">0</span></button>
+    <button role="tab" id="t-metrics" aria-selected="false" data-tab="metrics">4 · Métricas do piloto</button>
+  </nav>
+
+  <!-- CAPTURA -->
+  <section id="tab-capture">
+    <div class="note warn"><span>⚠</span><div><b>Limite conhecido:</b> o Tesseract lê bem texto impresso/digitado e mal manuscrito. Marque o <b>tipo de origem</b> de cada lote para medir a precisão separadamente. Todo resultado é uma <b>sugestão</b> até você confirmar na revisão.</div></div>
+    <div class="settings panel">
+      <label>Tipo de origem do lote
+        <select id="set-source"><option value="impresso">Impresso / digitado</option><option value="manuscrito">Manuscrito</option><option value="misto">Misto</option></select>
+      </label>
+      <label>DDD padrão (p/ números sem DDD)
+        <input type="text" id="set-ddd" inputmode="numeric" maxlength="2" placeholder="ex.: 83" style="width:110px">
+      </label>
+      <label class="chk"><input type="checkbox" id="set-bin" checked> Melhorar contraste (binarização adaptativa)</label>
+      <label class="chk"><input type="checkbox" id="set-backup" checked> Backup em CSV (ao concluir a revisão e a cada confirmação, se houver arquivo fixo)</label>
+      <span class="row" style="gap:8px"><button class="btn sm" type="button" id="btn-backup-file">Escolher arquivo de backup fixo…</button><button class="btn sm" type="button" id="btn-backup-clear" hidden>Remover</button><span class="muted" id="backup-file-txt" style="font-size:12.5px"></span></span>
+      <span class="muted" style="font-size:12.5px">Dica: se um documento sair ruim, na revisão use “Girar” e “Reprocessar” alternando o contraste.</span>
+    </div>
+    <div class="drop" id="drop">
+      <input type="file" id="file" accept="image/*" multiple aria-label="Selecionar fotos de prontuários">
+      <strong>Toque para fotografar ou escolha imagens (JPG, PNG, WEBP)</strong>
+      <span class="muted">Ou arraste e solte aqui. Fotografe com boa luz, o documento reto e preenchendo o enquadramento.</span>
+    </div>
+    <div class="row" style="margin-top:12px"><label class="btn primary" for="file-cam" style="cursor:pointer">📷 Fotografar ficha</label><input type="file" id="file-cam" accept="image/*" capture="environment" hidden><span class="muted" style="font-size:12.5px">No celular, abre direto a câmera. Para várias fichas, toque de novo após cada foto.</span></div>
+    <div class="queue" id="queue" aria-live="polite"></div>
+  </section>
+
+  <!-- REVISÃO -->
+  <section id="tab-review" hidden>
+    <div id="review-empty" class="panel empty">
+      <p><b>Nenhum documento para revisar.</b></p>
+      <p>Envie imagens na aba Captura ou clique em “Testar com documento fictício”.</p>
+    </div>
+    <div id="review-main" class="review-grid" hidden>
+      <div class="panel viewer">
+        <div class="vbar">
+          <button class="btn sm" type="button" data-z="1" title="Ajustar à largura">Ajustar</button>
+          <button class="btn sm" type="button" data-z="1.6">160%</button>
+          <button class="btn sm" type="button" data-z="2.4">240%</button>
+          <span class="sp"></span>
+          <label style="font-size:13px;display:flex;gap:5px;align-items:center"><input type="checkbox" id="show-lines"> Linhas do OCR</label>
+          <button class="btn sm" type="button" id="btn-rot-l" title="Girar 90° à esquerda">↺</button>
+          <button class="btn sm" type="button" id="btn-rot-r" title="Girar 90° à direita">↻</button>
+          <button class="btn sm" type="button" id="btn-reproc">Reprocessar</button>
+          <button class="btn sm" type="button" id="btn-raw">Texto bruto</button>
+        </div>
+        <div class="vscroll" id="vscroll"><div id="no-img" class="empty" hidden>Imagem não guardada (por privacidade, só os campos são salvos). Você pode revisar e corrigir os campos normalmente.</div><div class="stage" id="stage"><img id="doc-img" alt="Imagem do documento"><div class="ov" id="ov"></div></div></div>
+      </div>
+
+      <form class="panel form" id="form" autocomplete="off">
+        <div class="fhead">
+          <div><h2 id="f-title">Documento</h2><div class="fn" id="f-file"></div></div>
+          <div class="row" style="gap:6px">
+            <button class="btn sm" type="button" id="btn-prev" title="Alt + ←">←</button>
+            <button class="btn sm" type="button" id="btn-next" title="Alt + →">→</button>
+          </div>
+        </div>
+        <div id="f-warn"></div>
+
+        <div class="field" data-f="name">
+          <label for="i-name">Nome do paciente <span class="badge" id="b-name"></span></label>
+          <input id="i-name" type="text" placeholder="Nome completo">
+          <div class="hint" id="h-name"></div><div class="chips" id="c-name"></div>
+        </div>
+        <div class="field" data-f="phone">
+          <label for="i-phone">Telefone principal <span class="badge" id="b-phone"></span></label>
+          <input id="i-phone" type="text" inputmode="tel" placeholder="(00) 00000-0000">
+          <div class="hint" id="h-phone"></div><div class="chips" id="c-phone"></div>
+        </div>
+        <div class="field" data-f="email">
+          <label for="i-email">E-mail <span class="badge" id="b-email"></span></label>
+          <input id="i-email" type="text" inputmode="email" placeholder="nome@exemplo.com">
+          <div class="hint" id="h-email"></div><div class="chips" id="c-email"></div>
+        </div>
+        <div class="field" data-f="date">
+          <label for="i-date">Data do último atendimento <span class="badge" id="b-date"></span></label>
+          <input id="i-date" type="text" inputmode="numeric" placeholder="dd/mm/aaaa">
+          <div class="hint" id="h-date"></div><div class="chips" id="c-date"></div>
+        </div>
+
+        <div class="two">
+          <div class="field">
+            <label for="i-source">Tipo de origem</label>
+            <select id="i-source"><option value="impresso">Impresso / digitado</option><option value="manuscrito">Manuscrito</option><option value="misto">Misto</option></select>
+          </div>
+          <div class="field">
+            <label for="i-consent">Consentimento para contato</label>
+            <select id="i-consent">
+              <option value="nao_informado">Não informado</option>
+              <option value="sim">Sim — consta documentado</option>
+              <option value="nao">Não / revogado</option>
+            </select>
+          </div>
+        </div>
+        <div class="hint" style="margin:-4px 0 10px">Marque “Sim” somente se houver registro documental do consentimento. Sem “Sim”, o contato fica fora da lista de captação.</div>
+
+        <div class="fact">
+          <button class="btn primary" type="submit" id="btn-confirm">Confirmar e próximo <span class="kbd">Ctrl+Enter</span></button>
+          <button class="btn" type="button" id="btn-skip">Pular</button>
+          <button class="btn danger" type="button" id="btn-discard">Descartar</button>
+        </div>
+        <div class="hint" style="margin-top:10px">Dica: clique num campo e depois numa linha da imagem (com “Linhas do OCR” ligado) para preencher o campo com aquela linha.</div>
+      </form>
+    </div>
+  </section>
+
+  <!-- BASE -->
+  <section id="tab-base" hidden>
+    <div class="tools">
+      <div class="l">
+        <input type="search" id="q" placeholder="Buscar nome, telefone, e-mail…" aria-label="Buscar">
+        <select id="f-status" aria-label="Filtrar por status"><option value="">Todos os status</option><option value="pendente">Pendentes</option><option value="confirmado">Confirmados</option><option value="descartado">Descartados</option></select>
+      </div>
+      <div class="r">
+        <button class="btn" type="button" id="btn-exp-all">Exportar contatos confirmados <span class="muted" id="cnt-all"></span></button>
+        <button class="btn primary" type="button" id="btn-exp-mkt">Exportar lista de captação <span id="cnt-mkt"></span></button>
+      </div>
+    </div>
+    <div class="note info"><span>ℹ</span><div>Duas listas separadas: <b>contatos confirmados</b> (cadastro/guarda) e <b>captação</b> (somente <i>confirmado</i> + consentimento “Sim” + telefone ou e-mail). O CSV nunca inclui conteúdo clínico, texto bruto nem imagens — só nome, contato e data. Dados de saúde são sensíveis pela LGPD: confirme a base legal com seu jurídico/encarregado antes de qualquer contato de captação.</div></div>
+    <div class="tbl">
+      <table>
+        <thead><tr><th>Doc</th><th>Status</th><th>Nome</th><th>Telefone</th><th>E-mail</th><th>Últ. atend.</th><th>Consent.</th><th>Origem</th><th></th></tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+      <div class="empty" id="base-empty" hidden>Nenhum registro ainda.</div>
+    </div>
+    <div class="tools" style="margin-top:14px">
+      <div class="l">
+        <button class="btn" type="button" id="btn-save">Salvar agora</button>
+        <span class="muted" style="font-size:12.5px">Com o salvamento automático ligado, cada alteração é gravada cifrada neste navegador (só campos, sem imagens nem texto bruto) e expira 7 dias após o último salvamento.</span>
+      </div>
+      <div class="r">
+        <button class="btn" type="button" id="btn-wipe-img">Apagar imagens e texto bruto</button>
+        <button class="btn danger" type="button" id="btn-clear">Limpar tudo</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- MÉTRICAS -->
+  <section id="tab-metrics" hidden>
+    <div id="metrics-body"></div>
+  </section>
+
+  <footer>
+    Protótipo de piloto — não é produto final nem aconselhamento jurídico. O OCR sugere; a pessoa revisora confirma. Metas e critérios de go/no-go são os do roteiro do piloto (≥ 90% de campos sem correção).
+  </footer>
+</div>
+
+<!-- Diálogos -->
+<dialog id="dlg-raw"><h3>Texto reconhecido pelo OCR</h3><p class="muted" style="font-size:13px;margin:0 0 6px">Texto bruto, antes das regras de extração. Fica só na memória desta página.</p><pre class="raw" id="raw-txt"></pre><div class="mf"><button class="btn primary" type="button" data-close>Fechar</button></div></dialog>
+<dialog id="dlg-pass"><form method="dialog" id="pass-form"><h3 id="pass-title">Senha</h3><p class="muted" style="font-size:13px;margin:0" id="pass-desc"></p><input type="password" id="pass-in" autocomplete="off" aria-label="Senha" minlength="6"><div class="hint b" id="pass-err" style="min-height:16px"></div><div class="mf"><button class="btn" type="button" data-close>Cancelar</button><button class="btn primary" type="submit" id="pass-ok">OK</button></div></form></dialog>
+<dialog id="dlg-start"><form id="start-form" autocomplete="off"><h3 id="st-title"></h3><p class="muted" id="st-desc" style="font-size:13px;margin:0"></p><input type="password" id="st-pass" aria-label="Senha" autocomplete="off"><input type="password" id="st-pass2" aria-label="Repita a senha" placeholder="Repita a senha" autocomplete="off" style="margin-top:8px"><div class="hint b" id="st-err" style="min-height:16px"></div><div class="mf"><button class="btn" type="button" id="st-alt"></button><button class="btn primary" type="submit" id="st-ok"></button></div></form></dialog>
+<dialog id="dlg-confirm"><h3 id="cf-title">Confirmar</h3><p id="cf-text" class="muted"></p><div class="mf"><button class="btn" type="button" data-close>Cancelar</button><button class="btn danger" type="button" id="cf-ok">Confirmar</button></div></dialog>
+
+<script>
+"use strict";
+/* ============================================================
+   CONFIGURAÇÃO DO OCR
+   Por padrão os arquivos vêm do jsDelivr. Para uso 100% offline,
+   hospede-os (mesma pasta/servidor) e defina window.OCR_CONFIG
+   antes deste script, apontando para os arquivos locais.
+   ============================================================ */
+const CFG = Object.assign({
+  scriptUrl:  'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js',
+  scriptIntegrity: 'sha384-GJqSu7vueQ9qN0E9yLPb3Wtpd7OrgK8KmYzC8T1IysG1bcvxvIO4qtYR/D3A991F',
+  workerPath: 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/worker.min.js',
+  corePath:   'https://cdn.jsdelivr.net/npm/tesseract.js-core@5.1.0',
+  langPath:   'https://cdn.jsdelivr.net/npm/@tesseract.js-data/por@1.0.0/4.0.0_best_int',
+  lang: 'por'
+}, window.OCR_CONFIG || {});
+
+/* ============================================================
+   EXTRAÇÃO — regras sobre as linhas reconhecidas
+   ============================================================ */
+const Extract = (() => {
+  const VALID_DDD = new Set('11 12 13 14 15 16 17 18 19 21 22 24 27 28 31 32 33 34 35 37 38 41 42 43 44 45 46 47 48 49 51 53 54 55 61 62 63 64 65 66 67 68 69 71 73 74 75 77 79 81 82 83 84 85 86 87 88 89 91 92 93 94 95 96 97 98 99'.split(' '));
+  const strip = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '');
+  const norm = s => strip(s).toLowerCase();
+  const mean = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0;
+  const FIX = { O: '0', o: '0', I: '1', l: '1', '|': '1', S: '5', s: '5', B: '8' };
+  const fixDigits = s => s.replace(/[OoIl|SsB]/g, c => FIX[c]);
+  const DATE_SRC = '(?<![\\dA-Za-z])([\\dOoIlSs]{2})\\s?[\\/.\\-]\\s?([\\dOoIlSs]{2})\\s?[\\/.\\-]\\s?([\\dOoIlSs]{4}|[\\dOoIlSs]{2})(?![\\dA-Za-z])';
+  const CONNECT = new Set(['de', 'da', 'do', 'dos', 'das', 'e', 'di', 'du', 'del', 'van', 'von']);
+
+  function wordsConf(line, pred) {
+    const ws = (line.words || []).filter(w => w.t && pred(w.t));
+    return Math.round(ws.length ? mean(ws.map(w => w.conf)) : (line.conf || 0));
+  }
+
+  /* ---------- telefone ---------- */
+  const SKIP_LINE = /\b(cpf|rg|cnh|cns|sus|cep|cnpj|matr[ií]cula|cart[aã]o)\b/i;
+  const SAC_LINE = /\b(sac|ouvidoria|0[3589]00)\b/i;
+  function phoneLabel(ctx) {
+    const t = norm(ctx);
+    if (/whats|zap/.test(t)) return ['whatsapp', 30];
+    if (/celular|\bcel\b/.test(t)) return ['celular', 25];
+    if (/principal|contato/.test(t)) return ['principal', 20];
+    if (/recado/.test(t)) return ['recado', 8];
+    if (/resid|\bfixo\b/.test(t)) return ['residencial', 10];
+    if (/comerc|trabalho|empresa/.test(t)) return ['comercial', 5];
+    if (/respons|\bmae\b|\bpai\b|esposa|marido|conjuge|filh/.test(t)) return ['familiar', 6];
+    if (/\btel|fone/.test(t)) return ['telefone', 15];
+    return ['', 0];
+  }
+  function fmtPhone(ddd, num) {
+    const n = num.length === 9 ? num.slice(0, 5) + '-' + num.slice(5) : num.slice(0, 4) + '-' + num.slice(4);
+    return ddd ? `(${ddd}) ${n}` : n;
+  }
+  function validatePhone(ddd, num, defaultDdd) {
+    const flags = [];
+    if (/^(\d)\1+$/.test(num) || num[0] === '0') return null;
+    if (num.length === 9 && num[0] !== '9') return null;
+    if (num.length === 8 && !'2345'.includes(num[0])) return null;
+    if (ddd) { if (!VALID_DDD.has(ddd)) return null; }
+    else if (defaultDdd && VALID_DDD.has(defaultDdd)) { ddd = defaultDdd; flags.push('DDD padrão aplicado'); }
+    else flags.push('sem DDD');
+    const type = num.length === 9 ? 'celular' : 'fixo';
+    return { ddd, num, type, flags, display: fmtPhone(ddd, num), whatsapp: ddd && type === 'celular' ? '55' + ddd + num : '' };
+  }
+  function phonesInText(text, defaultDdd, prevText) {
+    const masked = text.replace(new RegExp(DATE_SRC, 'g'), m => ' '.repeat(m.length));
+    if (SKIP_LINE.test(masked) || SAC_LINE.test(masked) || /www|https?:|\.com\.br/i.test(masked)) return [];
+    const out = [];
+    const runRe = /[+(]?[\dOoIl|Ss][\dOoIl|Ss()\s.\-]{6,}[\dOoIl|Ss]/g;
+    let prevEnd = 0, rm;
+    while ((rm = runRe.exec(masked))) {
+      const raw = rm[0];
+      const realDigits = (raw.match(/\d/g) || []).length;
+      if (realDigits < 6) continue;
+      const fixedUsed = /[OoIl|SsB]/.test(raw);
+      const fixed = fixDigits(raw);
+      const re = /(?<!\d)(?:\+?\s?55[\s.\-]*)?(?:\(?\s?(\d{2})\s?\)?[\s.\-]*)?(9?\d{4})[\s.\-]*(\d{4})(?!\d)/g;
+      let m;
+      while ((m = re.exec(fixed))) {
+        const v = validatePhone(m[1] || '', m[2] + m[3], defaultDdd);
+        if (!v) continue;
+        if (fixedUsed) v.flags.push('caracteres corrigidos (O→0 etc.)');
+        const idx = rm.index;
+        let ctx = masked.slice(prevEnd, idx);
+        let [label, ls] = phoneLabel(ctx);
+        if (!label && prevText && !ctx.trim()) [label, ls] = phoneLabel(prevText);
+        v.label = label; v.labelScore = ls;
+        out.push(v);
+      }
+      prevEnd = rm.index + raw.length;
+    }
+    return out;
+  }
+  const parsePhoneText = (t, ddd) => { const r = phonesInText(String(t || ''), ddd); return r[0] || null; };
+
+  /* ---------- e-mail ---------- */
+  function emailsInText(text) {
+    text = String(text); let rebuilt = false, texts = null;
+    // linha rotulada "e-mail": o OCR troca "@" por "Q"/"&" e perde o "_" (vira espaço)
+    const lm = text.match(/e[-_\s]?\s?mail\s*[:;.\-]?\s*(.+)$/i);
+    if (lm && !/@/.test(lm[1])) {
+      const rest = lm[1].replace(/(?<=[A-Za-z0-9._\-\s])[&©®Qq](?=[A-Za-z0-9\-]+(?:\.[A-Za-z0-9\-]+)*\.[A-Za-z]{2,}\s*$)/, '@');
+      if (/@/.test(rest)) {
+        rebuilt = true;
+        const at = rest.indexOf('@');
+        const dom = rest.slice(at + 1).replace(/\s+/g, '');
+        const loc = rest.slice(0, at).trim().replace(/\s*\.\s*/g, '.').replace(/\.{2,}/g, '.');
+        texts = /\s/.test(loc) ? ['_', '.', ''].map(j => loc.replace(/\s+/g, j) + '@' + dom) : [loc + '@' + dom];
+      } else texts = [lm[1]];
+    }
+    if (!texts) texts = [text];
+    const out = [];
+    texts.forEach((src, vi) => {
+      let t = src.replace(/©/g, '@').replace(/\(\s*arroba\s*\)/gi, '@').replace(/\s*@\s*/g, '@')
+        .replace(/(@[A-Za-z0-9\-]+)\s*[,;]\s*(com|net|org|br|gov|edu)\b/gi, '$1.$2')
+        .replace(/\.\s+(com|net|org|br|gov|edu)\b/gi, '.$1').replace(/(\.com)\s*\.\s*br/gi, '$1.br');
+      const re = /[A-Za-z0-9._%+\-]+@[A-Za-z0-9\-]+(?:\.[A-Za-z0-9\-]+)*\.[A-Za-z]{2,}/g; let m;
+      while ((m = re.exec(t))) {
+        let e = m[0].toLowerCase().replace(/^[.\-_]+/, '');
+        if (/\.\./.test(e) || e.startsWith('.') || e.split('@')[0].endsWith('.')) continue;
+        const common = /\.(com|net|org|edu|gov|info|med|adv|app|io)(\.br)?$|\.br$/.test(e);
+        const flags = common ? [] : ['domínio incomum — conferir'];
+        if (rebuilt) flags.push('e-mail reconstruído do OCR — conferir');
+        if (texts.length > 1) flags.push(vi === 0 ? 'underline “_” restaurado nos espaços — conferir' : vi === 1 ? 'variante com ponto' : 'variante sem separador');
+        out.push({ value: e, flags, variant: vi > 0 });
+      }
+    });
+    return out;
+  }
+
+  /* ---------- data ---------- */
+  function parseDateParts(a, b, c, now) {
+    const d = +fixDigits(a), mo = +fixDigits(b); let y = fixDigits(c); const flags = [];
+    if (y.length === 2) { const yy = +y, cur = now.getFullYear() % 100; y = (yy <= cur + 1 ? 2000 : 1900) + yy; flags.push('ano com 2 dígitos'); } else y = +y;
+    if (mo < 1 || mo > 12 || d < 1 || d > 31 || y < 1900 || y > now.getFullYear() + 1) return null;
+    const dt = new Date(y, mo - 1, d);
+    if (dt.getFullYear() !== y || dt.getMonth() !== mo - 1 || dt.getDate() !== d) return null;
+    return { dt, flags, display: `${String(d).padStart(2, '0')}/${String(mo).padStart(2, '0')}/${y}` };
+  }
+  function dateKind(ctx) {
+    const t = norm(ctx);
+    if (/nasc|\bd\.?n\.?\b|aniver/.test(t)) return 'nasc';
+    if (/retorn|volta|agend|proxim|reaval|marcad/.test(t)) return 'retorno';
+    if (/atend|consult|\bdata\b|\bdt\b|entrad|internac|\balta\b|evolu|visita|ultim/.test(t)) return 'atend';
+    return '';
+  }
+  function datesInText(text, now, prevText) {
+    const re = new RegExp(DATE_SRC, 'g'); const out = []; let m, prevEnd = 0;
+    while ((m = re.exec(text))) {
+      const p = parseDateParts(m[1], m[2], m[3], now);
+      if (!p) { prevEnd = m.index + m[0].length; continue; }
+      let ctx = text.slice(prevEnd, m.index);
+      let kind = dateKind(ctx);
+      if (!kind && prevText && !ctx.trim()) kind = dateKind(prevText);
+      out.push({ ...p, kind });
+      prevEnd = m.index + m[0].length;
+    }
+    return out;
+  }
+
+  /* ---------- nome ---------- */
+  const NAME_LABEL = /(?:^|\s{2,}|[|;,]\s*)(?:no(?:m|rn)e(?:\s+completo)?(?:\s+d[oa]\s+(?:paciente|cliente))?|paciente|cliente)\s*([:;.\-–—]|\s{2,})\s*(\S.*)$/i;
+  const NAME_LABEL_ALONE = /^\s*(?:no(?:m|rn)e(?:\s+completo)?(?:\s+d[oa]\s+paciente)?|paciente)\s*[:;.]?\s*$/i;
+  const STOP = /\b(compareceu|avalia|relata|refere|queixa|apresenta|encaminhad|exame|consulta|diagn|prescri|evolu|retorno|hospital|cl[ií]nica|ambulat|prontu|ficha|atendimento|data|nascimento|telefone|celular|e-?mail)\b/i;
+  const INST = /hospital|clinica|consult|prontu|ficha|ambulat|saude|centro|medic|laborat|secretaria|minist|estado|municipal|unidade|setor|data|exame|diagn|evolu|prescri|receita|resultado|exemplo|ficticio|registro|telefone|celular|email|contato/;
+  function titleCase(s) {
+    return s.toLowerCase().split(' ').map((w, i) => (i > 0 && CONNECT.has(w)) ? w : w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+  }
+  function cleanName(raw, allowSingle) {
+    const flags = [];
+    let s = String(raw).replace(/[(\[{].*$/, '').replace(/\bchamar\b.*$/i, '').split(/\s{2,}|\s+(?:data|dt|nasc|dn|d\.n|idade|sexo|rg|cpf|tel|cel|fone|end|prontu|reg|conv)\b/i)[0];
+    if (/\d/.test(s)) { flags.push('dígitos removidos'); s = s.replace(/\d+/g, ' '); }
+    s = s.replace(/[^A-Za-zÀ-ÖØ-öø-ÿ'’\- .]/g, ' ').replace(/\s+/g, ' ').replace(/^[\s.\-]+|[\s.\-]+$/g, '');
+    const words = s.split(' ').filter(Boolean);
+    const real = words.filter(w => !CONNECT.has(w.toLowerCase()));
+    if (words.length > 7 || STOP.test(strip(s))) return null;
+    if (real.length < 2) {
+      if (!(allowSingle && real.length === 1 && real[0].replace(/[.'’\-]/g, '').length >= 3)) return null;
+      flags.push('só um nome — conferir se está completo');
+    }
+    if (real.some(w => w.replace(/[.'’\-]/g, '').length < 2)) flags.push('palavra curta — conferir');
+    if (s === s.toUpperCase() || s === s.toLowerCase()) s = titleCase(s);
+    return { value: s, flags };
+  }
+
+  /* ---------- orquestração ---------- */
+  function extractAll(lines, opts = {}) {
+    const now = opts.today || new Date();
+    const ddd = opts.defaultDdd || '';
+    const res = {
+      fields: { name: '', phone: '', email: '', date: '' },
+      conf: { name: null, phone: null, email: null, date: null },
+      flags: { name: [], phone: [], email: [], date: [] },
+      boxes: { name: null, phone: null, email: null, date: null },
+      candidates: { phone: [], email: [], date: [] }
+    };
+
+    // nome
+    let nameC = null;
+    for (let i = 0; i < lines.length && !nameC; i++) {
+      const L = lines[i], t = L.text;
+      let m = t.match(NAME_LABEL), val = null, sep = null, ln = L;
+      if (m) { val = m[2]; sep = m[1]; }
+      else if (NAME_LABEL_ALONE.test(t) && lines[i + 1]) { val = lines[i + 1].text; sep = ':'; ln = lines[i + 1]; }
+      if (val == null) continue;
+      const c = cleanName(val, true);
+      if (!c) continue;
+      const wsSep = /^\s+$/.test(sep);
+      if (wsSep && c.value.split(' ').some(w => !CONNECT.has(w.toLowerCase()) && w[0] !== w[0].toUpperCase())) continue;
+      const vn = norm(c.value);
+      let conf = wordsConf(ln, w => vn.includes(norm(w).replace(/[^a-z]/g, '')) && norm(w).replace(/[^a-z]/g, '').length > 1);
+      const flags = c.flags.slice();
+      if (wsSep) { flags.push('sem “:” após o rótulo'); conf = Math.min(conf, 60); }
+      nameC = { value: c.value, conf, bbox: ln.bbox, flags };
+    }
+    if (!nameC) {
+      const lim = Math.max(8, Math.ceil(lines.length * 0.5));
+      for (let i = 0; i < Math.min(lines.length, lim); i++) {
+        const t = lines[i].text.trim();
+        if (INST.test(norm(t)) || /[@\d]/.test(t)) continue;
+        if (/^(?:[A-ZÀ-Ý][A-Za-zÀ-ÿ'’\-]+)(?:\s+(?:d[aeo]s?|e|[A-ZÀ-Ý][A-Za-zÀ-ÿ'’\-]+)){1,5}$/.test(t)) {
+          const c = cleanName(t);
+          if (c) { nameC = { value: c.value, conf: Math.min(lines[i].conf, 45), bbox: lines[i].bbox, flags: ['sugestão sem rótulo — conferir'] }; break; }
+        }
+      }
+    }
+    if (nameC) { res.fields.name = nameC.value; res.conf.name = Math.round(nameC.conf); res.flags.name = nameC.flags; res.boxes.name = nameC.bbox; }
+
+    // telefone
+    const phones = [];
+    const maxY = Math.max(1, ...lines.map(l => l.bbox[3]));
+    lines.forEach((L, i) => {
+      const prev = lines[i - 1] ? lines[i - 1].text : '';
+      phonesInText(L.text, ddd, /:\s*$/.test(prev) ? prev : '').forEach(p => {
+        const key = (p.ddd || '') + p.num;
+        if (phones.some(x => x.key === key)) return;
+        const conf = Math.max(0, wordsConf(L, w => /\d/.test(w)) - (p.flags.some(f => f.startsWith('caracteres')) ? 15 : 0) - (p.flags.includes('sem DDD') ? 10 : 0));
+        const footer = !p.label && L.bbox[1] > maxY * 0.92;
+        if (footer) p.flags.push('no rodapé da página (provável telefone da clínica)');
+        const score = p.labelScore + (p.type === 'celular' ? 10 : 0) + conf * 0.2 - (p.flags.includes('sem DDD') ? 15 : 0) - (footer ? 40 : 0);
+        phones.push({ key, value: p.display, label: p.label || 'sem rótulo', conf, bbox: L.bbox, flags: p.flags, score, whatsapp: p.whatsapp, type: p.type });
+      });
+    });
+    phones.sort((a, b) => b.score - a.score);
+    res.candidates.phone = phones;
+    if (phones[0]) { const p = phones[0]; res.fields.phone = p.value; res.conf.phone = Math.round(p.conf); res.flags.phone = p.flags.slice(); res.boxes.phone = p.bbox; if (!p.label || p.label === 'sem rótulo') res.flags.phone.push('sem rótulo — conferir'); if (p.label === 'familiar') res.flags.phone.push('telefone de familiar/responsável'); if (phones.length > 1) res.flags.phone.push(`${phones.length} telefones encontrados`); }
+
+    // e-mail
+    const emails = [];
+    lines.forEach(L => emailsInText(L.text).forEach(e => {
+      if (emails.some(x => x.value === e.value)) return;
+      const conf = Math.max(0, wordsConf(L, w => w.includes('@') || /[a-z]{3,}/i.test(w)) - (e.flags.length ? 15 : 0));
+      emails.push({ value: e.value, label: e.variant ? 'variante' : '', conf, bbox: L.bbox, flags: e.flags, variant: e.variant });
+    }));
+    res.candidates.email = emails;
+    if (emails[0]) { const e = emails[0]; res.fields.email = e.value; res.conf.email = Math.round(e.conf); res.flags.email = e.flags.slice(); res.boxes.email = e.bbox; const nEm = emails.filter(x => !x.variant).length; if (nEm > 1) res.flags.email.push(`${nEm} e-mails encontrados`); }
+
+    // data
+    const dates = [];
+    lines.forEach((L, i) => {
+      const prev = lines[i - 1] ? lines[i - 1].text : '';
+      datesInText(L.text, now, /:\s*$/.test(prev) ? prev : '').forEach(d => {
+        if (dates.some(x => x.display === d.display && x.kind === d.kind)) return;
+        dates.push({ ...d, conf: wordsConf(L, w => /\d/.test(w)), bbox: L.bbox });
+      });
+    });
+    const kindTxt = { nasc: 'nascimento', retorno: 'retorno', atend: 'atendimento', '': 'sem rótulo' };
+    res.candidates.date = dates.slice().sort((a, b) => b.dt - a.dt).map(d => ({ value: d.display, label: kindTxt[d.kind], conf: d.conf, bbox: d.bbox, flags: d.flags }));
+    const visits = dates.filter(d => d.kind === 'atend' && d.dt <= now);
+    const loose = dates.filter(d => d.kind === '' && d.dt <= now);
+    const pool = visits.length ? visits : loose;
+    if (pool.length) {
+      pool.sort((a, b) => b.dt - a.dt);
+      const d = pool[0];
+      res.fields.date = d.display; res.conf.date = Math.round(d.conf - (visits.length ? 0 : 15)); res.boxes.date = d.bbox; res.flags.date = d.flags.slice();
+      if (!visits.length) res.flags.date.push('data sem rótulo — conferir');
+      if (new Set(pool.map(x => x.display)).size > 1) res.flags.date.push(`${new Set(pool.map(x => x.display)).size} datas candidatas — usei a mais recente`);
+    }
+    return res;
+  }
+
+  function fieldFromLine(field, lineText, ddd, now) {
+    if (field === 'name') { const m = lineText.match(NAME_LABEL); const c = cleanName(m ? m[2] : lineText, !!m); return c ? c.value : ''; }
+    if (field === 'phone') { const p = parsePhoneText(lineText, ddd); return p ? p.display : ''; }
+    if (field === 'email') { const e = emailsInText(lineText)[0]; return e ? e.value : ''; }
+    if (field === 'date') { const d = datesInText(lineText, now || new Date())[0]; return d ? d.display : ''; }
+    return '';
+  }
+  const isValidDate = s => { const m = String(s).match(/^(\d{2})\/(\d{2})\/(\d{4})$/); return !!(m && parseDateParts(m[1], m[2], m[3], new Date())); };
+  const isValidEmail = s => /^[A-Za-z0-9._%+\-]+@[A-Za-z0-9\-]+(\.[A-Za-z0-9\-]+)*\.[A-Za-z]{2,}$/.test(String(s).trim());
+  return { extractAll, parsePhoneText, fieldFromLine, isValidDate, isValidEmail, norm, strip };
+})();
+
+/* ============================================================
+   IMAGEM — pré-processamento
+   ============================================================ */
+function adaptiveThreshold(gray, W, H) {
+  const S = new Uint32Array((W + 1) * (H + 1));
+  for (let y = 0; y < H; y++) {
+    let row = 0;
+    for (let x = 0; x < W; x++) { row += gray[y * W + x]; S[(y + 1) * (W + 1) + x + 1] = S[y * (W + 1) + x + 1] + row; }
+  }
+  const r = Math.max(8, Math.round(Math.max(W, H) / 64));
+  const out = new Uint8ClampedArray(W * H);
+  for (let y = 0; y < H; y++) {
+    const y0 = Math.max(0, y - r), y1 = Math.min(H, y + r + 1);
+    for (let x = 0; x < W; x++) {
+      const x0 = Math.max(0, x - r), x1 = Math.min(W, x + r + 1);
+      const sum = S[y1 * (W + 1) + x1] - S[y0 * (W + 1) + x1] - S[y1 * (W + 1) + x0] + S[y0 * (W + 1) + x0];
+      const mean = sum / ((x1 - x0) * (y1 - y0));
+      out[y * W + x] = gray[y * W + x] < mean * 0.88 ? 0 : 255;
+    }
+  }
+  return out;
+}
+async function prepareImages(blob, rotation, binarize) {
+  const bmp = await createImageBitmap(blob);
+  const rot = ((rotation % 360) + 360) % 360, swap = rot === 90 || rot === 270;
+  const sw = swap ? bmp.height : bmp.width, sh = swap ? bmp.width : bmp.height;
+  const scale = Math.min(2.5, Math.max(0.2, 2400 / Math.max(sw, sh)));
+  const W = Math.round(sw * scale), H = Math.round(sh * scale);
+  const disp = document.createElement('canvas'); disp.width = W; disp.height = H;
+  const c = disp.getContext('2d', { willReadFrequently: true });
+  c.fillStyle = '#fff'; c.fillRect(0, 0, W, H);
+  c.save(); c.translate(W / 2, H / 2); c.rotate(rot * Math.PI / 180);
+  c.drawImage(bmp, -bmp.width * scale / 2, -bmp.height * scale / 2, bmp.width * scale, bmp.height * scale); c.restore();
+  if (bmp.close) bmp.close();
+  const img = c.getImageData(0, 0, W, H), d = img.data;
+  let gray = new Uint8ClampedArray(W * H);
+  for (let i = 0, p = 0; i < d.length; i += 4, p++) gray[p] = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+  if (binarize) gray = adaptiveThreshold(gray, W, H);
+  const ocr = document.createElement('canvas'); ocr.width = W; ocr.height = H;
+  const oc = ocr.getContext('2d'); const oimg = oc.createImageData(W, H);
+  for (let p = 0, i = 0; p < gray.length; p++, i += 4) { oimg.data[i] = oimg.data[i + 1] = oimg.data[i + 2] = gray[p]; oimg.data[i + 3] = 255; }
+  oc.putImageData(oimg, 0, 0);
+  const dispBlob = await new Promise(res => disp.toBlob(res, 'image/jpeg', 0.85));
+  return { ocr, dispBlob, W, H };
+}
+
+/* ============================================================
+   MOTOR OCR (Tesseract.js, carregado sob demanda)
+   ============================================================ */
+const Engine = {
+  worker: null, loading: null, onProgress: null,
+  setStatus(kind, txt) { const e = document.getElementById('engine'); e.className = 'engine ' + kind; document.getElementById('engine-txt').textContent = txt; },
+  loadScript() {
+    return new Promise((resolve, reject) => {
+      if (window.Tesseract) return resolve();
+      const s = document.createElement('script'); s.src = CFG.scriptUrl;
+      if (CFG.scriptIntegrity) { s.integrity = CFG.scriptIntegrity; s.crossOrigin = 'anonymous'; }
+      s.onload = () => resolve(); s.onerror = () => reject(new Error('Não foi possível baixar o motor OCR. Verifique a conexão ou hospede os arquivos localmente (veja CONFIGURAÇÃO DO OCR no código).'));
+      document.head.appendChild(s);
+    });
+  },
+  async get() {
+    if (this.worker) return this.worker;
+    if (this.loading) return this.loading;
+    this.setStatus('loading', 'Motor OCR: carregando…');
+    this.loading = (async () => {
+      try {
+        await this.loadScript();
+        const w = await Tesseract.createWorker(CFG.lang, 1, {
+          workerPath: CFG.workerPath, corePath: CFG.corePath, langPath: CFG.langPath,
+          logger: m => { if (this.onProgress) this.onProgress(m); }
+        });
+        await w.setParameters({ preserve_interword_spaces: '1' });
+        this.worker = w; this.setStatus('ready', 'Motor OCR: pronto (idioma: português)');
+        return w;
+      } catch (e) {
+        this.loading = null;
+        const blocked = e && (e.name === 'SecurityError' || /Failed to construct 'Worker'|blob-request|cannot be accessed from origin/i.test(String(e.message || e)));
+        if (blocked) {
+          this.setStatus('error', 'Motor OCR: bloqueado neste ambiente');
+          throw new Error('Esta pré-visualização bloqueia o motor OCR (Web Workers). Baixe o arquivo .html e abra-o direto no computador (duplo clique), no Chrome ou Edge.');
+        }
+        this.setStatus('error', 'Motor OCR: erro ao carregar'); throw e;
+      }
+    })();
+    return this.loading;
+  },
+  async recognize(canvas, onProgress) {
+    const w = await this.get();
+    this.onProgress = m => { if (m.status === 'recognizing text' && onProgress) onProgress(m.progress); };
+    const r = await w.recognize(canvas);
+    this.onProgress = null;
+    const d = r.data;
+    const lines = (d.lines || []).map(l => ({
+      text: (l.text || '').replace(/\s+$/, ''), conf: l.confidence,
+      bbox: [l.bbox.x0, l.bbox.y0, l.bbox.x1, l.bbox.y1],
+      words: (l.words || []).map(x => ({ t: x.text, conf: x.confidence, bbox: [x.bbox.x0, x.bbox.y0, x.bbox.x1, x.bbox.y1] }))
+    })).filter(l => l.text.trim());
+    return { lines, text: d.text || '', conf: d.confidence };
+  }
+};
+
+/* ============================================================
+   ESTADO E UTILITÁRIOS
+   ============================================================ */
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const FIELDS = ['name', 'phone', 'email', 'date'];
+const FIELD_LABEL = { name: 'Nome', phone: 'Telefone', email: 'E-mail', date: 'Data' };
+const SRC_LABEL = { impresso: 'Impresso', manuscrito: 'Manuscrito', misto: 'Misto' };
+const CONSENT_LABEL = { nao_informado: 'Não informado', sim: 'Sim', nao: 'Não/revogado' };
+
+const state = { records: [], seq: 1, currentId: null, zoom: 1, focusField: null, lastInteraction: Date.now(), dirtyUnsaved: false };
+const recById = id => state.records.find(r => r.id === id);
+const cur = () => recById(state.currentId);
+const pad = n => String(n).padStart(4, '0');
+
+function toast(msg) {
+  const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg; t.setAttribute('role', 'status');
+  document.body.appendChild(t); setTimeout(() => t.remove(), 3200);
+}
+function confirmDialog(title, text, okLabel) {
+  return new Promise(res => {
+    const d = $('#dlg-confirm'); $('#cf-title').textContent = title; $('#cf-text').textContent = text; $('#cf-ok').textContent = okLabel || 'Confirmar';
+    const ok = $('#cf-ok'); const done = v => { ok.onclick = null; d.onclose = null; d.close(); res(v); };
+    ok.onclick = () => done(true); d.onclose = () => res(false); d.showModal();
+  });
+}
+$$('dialog [data-close]').forEach(b => b.addEventListener('click', () => b.closest('dialog').close()));
+
+/* ============================================================
+   ABAS
+   ============================================================ */
+function showTab(name) {
+  $$('nav.tabs button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === name)));
+  ['capture', 'review', 'base', 'metrics'].forEach(t => $('#tab-' + t).hidden = t !== name);
+  if (name === 'review') renderReview();
+  if (name === 'base') renderBase();
+  if (name === 'metrics') renderMetrics();
+}
+$$('nav.tabs button').forEach(b => b.addEventListener('click', () => showTab(b.dataset.tab)));
+function currentTab() { const b = $('nav.tabs button[aria-selected="true"]'); return b ? b.dataset.tab : 'capture'; }
+function refreshCounts() {
+  $('#n-pend').textContent = state.records.filter(r => r.status === 'pendente').length;
+  $('#n-base').textContent = state.records.length;
+}
+
+/* ============================================================
+   CAPTURA E FILA DE OCR
+   ============================================================ */
+let chain = Promise.resolve();
+function enqueueFiles(files, opts = {}) {
+  const list = Array.from(files).filter(f => f.type.startsWith('image/'));
+  if (!list.length) { toast('Selecione arquivos de imagem.'); return; }
+  const first = { done: false };
+  list.forEach(f => { chain = chain.then(() => processFile(f, opts, first)); });
+  chain = chain.then(() => { refreshCounts(); if (currentTab() === 'capture' && state.records.some(r => r.status === 'pendente')) { openNextPending(); showTab('review'); } });
+}
+async function processFile(file, opts, first) {
+  const q = document.createElement('div'); q.className = 'q';
+  q.innerHTML = `<div class="qh"><span class="qn">${esc(file.name)}</span><span class="qs">Na fila…</span></div><div class="bar"><div></div></div>`;
+  $('#queue').prepend(q);
+  const st = q.querySelector('.qs'), bar = q.querySelector('.bar>div');
+  const set = (p, t) => { bar.style.width = p + '%'; st.textContent = t; };
+  try {
+    const rec = await ocrBlob(file, file.name, { rotation: 0, sourceType: opts.sourceType || $('#set-source').value }, set);
+    state.records.unshift(rec); state.dirtyUnsaved = true;
+    q.classList.add('done'); set(100, 'Concluído em ' + (rec.ocrMs / 1000).toFixed(1) + ' s');
+    refreshCounts();
+  } catch (e) {
+    console.error(e); q.classList.add('err'); st.textContent = 'Erro: ' + (e.message || e);
+  }
+  setTimeout(() => { if (q.classList.contains('done')) q.remove(); }, 6000);
+}
+async function ocrBlob(blob, filename, o, setProgress) {
+  const t0 = performance.now();
+  setProgress(5, 'Pré-processando imagem…');
+  const prep = await prepareImages(blob, o.rotation, $('#set-bin').checked);
+  setProgress(12, 'Carregando motor OCR…');
+  const ocr = await Engine.recognize(prep.ocr, p => setProgress(15 + Math.round(p * 80), 'Reconhecendo texto… ' + Math.round(p * 100) + '%'));
+  setProgress(97, 'Extraindo campos…');
+  const ex = Extract.extractAll(ocr.lines, { defaultDdd: $('#set-ddd').value.trim() });
+  const imgUrl = URL.createObjectURL(prep.dispBlob);
+  return {
+    id: 'r' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+    seq: o.seq || state.seq++, filename, capturedAt: new Date().toISOString(),
+    status: 'pendente', consent: 'nao_informado', sourceType: o.sourceType,
+    fields: { ...ex.fields }, suggested: { ...ex.fields }, conf: ex.conf, flags: ex.flags, boxes: ex.boxes, candidates: ex.candidates,
+    lines: ocr.lines, rawText: ocr.text, ocrConf: ocr.conf, W: prep.W, H: prep.H, imgUrl, src: blob, rotation: o.rotation,
+    ocrMs: Math.round(performance.now() - t0), reviewMs: 0, result: null, edited: {}
+  };
+}
+$('#file').addEventListener('change', e => { if (e.target.files.length) enqueueFiles(e.target.files); e.target.value = ''; });
+$('#file-cam').addEventListener('change', e => { if (e.target.files.length) enqueueFiles(e.target.files); e.target.value = ''; });
+const drop = $('#drop');
+['dragenter', 'dragover'].forEach(n => drop.addEventListener(n, e => { e.preventDefault(); drop.classList.add('over'); }));
+['dragleave', 'drop'].forEach(n => drop.addEventListener(n, e => { e.preventDefault(); drop.classList.remove('over'); }));
+drop.addEventListener('drop', e => { if (e.dataTransfer && e.dataTransfer.files.length) enqueueFiles(e.dataTransfer.files); });
+
+/* Documento fictício (só para testar o pipeline com OCR real) */
+async function makeSampleBlob() {
+  const W = 1240, H = 1000, c = document.createElement('canvas'); c.width = W; c.height = H;
+  const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, W, H);
+  g.save(); g.translate(W / 2, H / 2); g.rotate(-0.012); g.translate(-W / 2, -H / 2);
+  g.fillStyle = '#111'; g.textBaseline = 'top';
+  g.font = 'bold 40px Arial, Helvetica, sans-serif'; g.fillText('CLÍNICA EXEMPLO — FICHA DE ATENDIMENTO', 70, 60);
+  g.font = 'bold 28px Arial, Helvetica, sans-serif'; g.fillStyle = '#b00020'; g.fillText('*** DOCUMENTO FICTÍCIO PARA TESTE — DADOS INVENTADOS ***', 70, 120);
+  g.fillStyle = '#111'; g.font = '32px Arial, Helvetica, sans-serif';
+  const rows = [
+    'Nº Registro: 004512',
+    'Nome do Paciente: Mariana Souza e Silva',
+    'Data de Nascimento: 12/03/1988',
+    'Data do Atendimento: 14/05/2024',
+    'Telefone Residencial: (83) 3244-5566',
+    'Celular / WhatsApp: (83) 98765-4321',
+    'E-mail: mariana.silva@exemplo.com.br',
+    'SAC da clínica: 0800 772 1000',
+    'Retorno agendado: 20/06/2024',
+    'Evolução: paciente compareceu para avaliação de rotina,',
+    'sem queixas agudas. Orientado acompanhamento regular.'
+  ];
+  rows.forEach((t, i) => g.fillText(t, 70, 200 + i * 62));
+  g.restore();
+  return new Promise(res => c.toBlob(res, 'image/png'));
+}
+$('#btn-sample').addEventListener('click', async () => {
+  showTab('capture');
+  const blob = await makeSampleBlob();
+  const f = new File([blob], 'EXEMPLO_ficticio.png', { type: 'image/png' });
+  enqueueFiles([f], { sourceType: 'impresso' });
+});
+
+/* ============================================================
+   REVISÃO
+   ============================================================ */
+function pendingList() { return state.records.filter(r => r.status === 'pendente'); }
+function openNextPending(afterId) {
+  const list = pendingList();
+  if (!list.length) { state.currentId = null; return null; }
+  let i = afterId ? list.findIndex(r => r.id === afterId) : -1;
+  const next = list[(i + 1) % list.length];
+  state.currentId = next.id; return next;
+}
+function openRecord(id) { state.currentId = id; showTab('review'); }
+
+function confClass(c) { return c == null ? '' : c >= 85 ? 'hi' : c >= 60 ? 'mid' : 'lo'; }
+function setBadge(f, rec) {
+  const b = $('#b-' + f), input = $('#i-' + f), hint = $('#h-' + f);
+  const val = rec.fields[f], c = rec.conf[f];
+  input.classList.remove('low', 'vlow'); b.className = 'badge';
+  let text = '';
+  if (rec.edited[f]) { text = 'editado'; }
+  else if (!val) { text = 'não encontrado'; }
+  else if (c != null) { text = (c >= 85 ? 'confiança alta ' : c >= 60 ? 'confiança média ' : 'confiança baixa ') + c + '%'; b.classList.add(confClass(c)); if (c < 60) input.classList.add('vlow'); else if (c < 85) input.classList.add('low'); }
+  b.textContent = text;
+  // dicas de validação
+  let msg = '', cls = '';
+  if (val) {
+    if (f === 'phone') { const p = Extract.parsePhoneText(val, $('#set-ddd').value.trim()); if (!p) { msg = 'Formato de telefone não reconhecido.'; cls = 'b'; } else if (p.flags.includes('sem DDD')) { msg = 'Sem DDD.'; cls = 'w'; } }
+    if (f === 'email' && !Extract.isValidEmail(val)) { msg = 'E-mail com formato inválido.'; cls = 'b'; }
+    if (f === 'date' && !Extract.isValidDate(val)) { msg = 'Use dd/mm/aaaa.'; cls = 'b'; }
+    if (f === 'name' && val.trim().split(/\s+/).length < 2) { msg = 'Nome parece incompleto.'; cls = 'w'; }
+  }
+  const fl = (!rec.edited[f] && rec.flags[f] || []).filter(Boolean);
+  if (!msg && fl.length) { msg = fl.join(' · '); cls = 'w'; }
+  hint.textContent = msg; hint.className = 'hint ' + cls;
+}
+function renderChips(f, rec) {
+  const box = $('#c-' + f); box.innerHTML = '';
+  const list = (rec.candidates[f] || []).filter(c => c.value !== rec.fields[f]);
+  list.slice(0, 6).forEach(c => {
+    const el = document.createElement('button'); el.type = 'button'; el.className = 'chip';
+    el.innerHTML = esc(c.value) + (c.label ? ` <small>(${esc(c.label)})</small>` : '');
+    el.addEventListener('click', () => { rec.fields[f] = c.value; rec.conf[f] = Math.round(c.conf); rec.boxes[f] = c.bbox; rec.flags[f] = c.flags || []; rec.edited[f] = false; fillForm(rec); focusBox(f); });
+    box.appendChild(el);
+  });
+}
+function duplicatesOf(rec) {
+  const n = Extract.norm(rec.fields.name || '').replace(/[^a-z ]/g, '').trim();
+  const ph = (rec.fields.phone || '').replace(/\D/g, '');
+  return state.records.filter(o => o.id !== rec.id && o.status !== 'descartado' && (
+    (ph.length >= 8 && (o.fields.phone || '').replace(/\D/g, '') === ph) ||
+    (n && n.split(' ').length > 1 && Extract.norm(o.fields.name || '').replace(/[^a-z ]/g, '').trim() === n)));
+}
+function fillForm(rec) {
+  FIELDS.forEach(f => { $('#i-' + f).value = rec.fields[f] || ''; setBadge(f, rec); renderChips(f, rec); });
+  $('#i-source').value = rec.sourceType; $('#i-consent').value = rec.consent;
+  const dups = duplicatesOf(rec);
+  $('#f-warn').innerHTML = dups.length ? `<div class="note warn" style="margin-bottom:10px"><span>⚠</span><div>Possível duplicado de ${dups.map(d => 'DOC-' + pad(d.seq)).join(', ')} (mesmo nome ou telefone).</div></div>` : '';
+}
+function renderReview() {
+  refreshCounts();
+  let rec = cur();
+  if (!rec || rec.status === 'descartado') { rec = pendingList()[0]; state.currentId = rec ? rec.id : null; }
+  $('#review-empty').hidden = !!rec; $('#review-main').hidden = !rec;
+  if (!rec) return;
+  const list = pendingList(), idx = list.findIndex(r => r.id === rec.id);
+  $('#f-title').textContent = 'DOC-' + pad(rec.seq) + (rec.status === 'confirmado' ? ' · confirmado' : '');
+  $('#f-file').textContent = rec.filename + (idx >= 0 ? ` · ${idx + 1} de ${list.length} pendentes` : '');
+  const img = $('#doc-img'); if (img.dataset.rid !== rec.id + ':' + rec.imgUrl) { img.src = rec.imgUrl; img.dataset.rid = rec.id + ':' + rec.imgUrl; }
+  if (!rec.imgUrl) { img.removeAttribute('src'); }
+  $('#no-img').hidden = !!rec.imgUrl; $('#stage').hidden = !rec.imgUrl;
+  applyZoom(); drawOverlay(); fillForm(rec);
+  $('#btn-reproc').disabled = !rec.src;
+  $('#btn-raw').disabled = !rec.rawText;
+}
+function applyZoom() { $('#stage').style.width = (state.zoom * 100) + '%'; }
+function drawOverlay() {
+  const rec = cur(), ov = $('#ov'); ov.innerHTML = ''; if (!rec || !rec.W) return;
+  const mk = (bb, cls, onclick, title) => {
+    const d = document.createElement('div'); d.className = 'b ' + cls;
+    d.style.left = (bb[0] / rec.W * 100) + '%'; d.style.top = (bb[1] / rec.H * 100) + '%';
+    d.style.width = ((bb[2] - bb[0]) / rec.W * 100) + '%'; d.style.height = ((bb[3] - bb[1]) / rec.H * 100) + '%';
+    if (onclick) d.addEventListener('click', onclick); if (title) d.title = title; ov.appendChild(d); return d;
+  };
+  if ($('#show-lines').checked) rec.lines.forEach(l => mk(l.bbox, 'ln', () => applyLine(l), 'Clique para usar esta linha no campo selecionado'));
+  const f = state.focusField;
+  if (f && rec.boxes[f]) { const d = mk(rec.boxes[f], 'hl'); d.id = 'hl-box'; }
+}
+function focusBox(f) {
+  state.focusField = f; drawOverlay();
+  const rec = cur(), hl = $('#hl-box');
+  if (hl && rec) { const sc = $('#vscroll'); const top = hl.offsetTop - sc.clientHeight / 3; sc.scrollTo({ top: Math.max(0, top), behavior: 'smooth' }); }
+}
+function applyLine(l) {
+  const rec = cur(), f = state.focusField; if (!rec || !f) { toast('Clique antes em um campo do formulário.'); return; }
+  const v = Extract.fieldFromLine(f, l.text, $('#set-ddd').value.trim());
+  if (!v) { toast('Não encontrei ' + FIELD_LABEL[f].toLowerCase() + ' nessa linha.'); return; }
+  rec.fields[f] = v; rec.edited[f] = true; rec.boxes[f] = l.bbox; fillForm(rec); drawOverlay();
+}
+FIELDS.forEach(f => {
+  const inp = $('#i-' + f);
+  inp.addEventListener('focus', () => focusBox(f));
+  inp.addEventListener('input', () => { const rec = cur(); if (!rec) return; rec.fields[f] = inp.value; rec.edited[f] = rec.fields[f] !== (rec.suggested[f] || ''); state.dirtyUnsaved = true; setBadge(f, rec); renderChips(f, rec); });
+});
+$('#i-source').addEventListener('change', e => { const r = cur(); if (r) r.sourceType = e.target.value; });
+$('#i-consent').addEventListener('change', e => { const r = cur(); if (r) r.consent = e.target.value; });
+$('#show-lines').addEventListener('change', drawOverlay);
+$$('.vbar [data-z]').forEach(b => b.addEventListener('click', () => { state.zoom = +b.dataset.z; applyZoom(); }));
+
+function goNext(afterId) {
+  const next = openNextPending(afterId);
+  if (next) renderReview(); else { showTab('base'); toast('Todos os documentos foram revisados.'); autoBackup().then(r => { if (r.n) toast(r.file ? 'Backup atualizado em ' + r.file + ' (' + r.n + ' contatos).' : 'Backup CSV baixado (' + r.n + ' contatos).'); }); }
+}
+$('#form').addEventListener('submit', e => { e.preventDefault(); confirmCurrent(); });
+function confirmCurrent() {
+  const rec = cur(); if (!rec) return;
+  const bad = [];
+  if (rec.fields.email && !Extract.isValidEmail(rec.fields.email)) bad.push('e-mail');
+  if (rec.fields.date && !Extract.isValidDate(rec.fields.date)) bad.push('data');
+  if (rec.fields.phone && !Extract.parsePhoneText(rec.fields.phone)) bad.push('telefone');
+  if (bad.length) { toast('Corrija o campo inválido: ' + bad.join(', ') + '.'); return; }
+  rec.result = {};
+  FIELDS.forEach(f => {
+    const s = (rec.suggested[f] || '').trim(), v = (rec.fields[f] || '').trim();
+    rec.result[f] = !v ? 'vazio' : !s ? 'manual' : (s === v ? 'ok' : 'corrigido');
+  });
+  rec.status = 'confirmado'; state.dirtyUnsaved = true; refreshCounts();
+  if (BK.handle && $('#set-backup').checked) writeBackupFile();
+  toast('DOC-' + pad(rec.seq) + ' confirmado.');
+  goNext(rec.id);
+}
+$('#btn-skip').addEventListener('click', () => { const r = cur(); if (r) goNext(r.id); });
+$('#btn-discard').addEventListener('click', async () => {
+  const r = cur(); if (!r) return;
+  if (!await confirmDialog('Descartar documento?', 'O documento sai da fila (não entra nas exportações). Use para páginas ilegíveis ou sem dados de contato.', 'Descartar')) return;
+  r.status = 'descartado'; r.result = null; releaseHeavy(r); refreshCounts(); goNext(r.id);
+});
+$('#btn-prev').addEventListener('click', () => step(-1));
+$('#btn-next').addEventListener('click', () => step(1));
+function step(d) {
+  const list = state.records.filter(r => r.status !== 'descartado'); if (!list.length) return;
+  const i = list.findIndex(r => r.id === state.currentId); state.currentId = list[(i + d + list.length) % list.length].id; renderReview();
+}
+document.addEventListener('keydown', e => {
+  if (currentTab() !== 'review') return;
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); confirmCurrent(); }
+  if (e.altKey && e.key === 'ArrowRight') { e.preventDefault(); step(1); }
+  if (e.altKey && e.key === 'ArrowLeft') { e.preventDefault(); step(-1); }
+});
+async function reprocess(deltaRot) {
+  const rec = cur(); if (!rec || !rec.src) return;
+  const edited = Object.values(rec.edited).some(Boolean);
+  if (edited && !await confirmDialog('Reprocessar?', 'Suas edições neste documento serão substituídas por uma nova leitura.', 'Reprocessar')) return;
+  const btn = $('#btn-reproc'); btn.disabled = true; btn.textContent = 'Lendo…';
+  try {
+    const n = await ocrBlob(rec.src, rec.filename, { rotation: rec.rotation + deltaRot, sourceType: rec.sourceType, seq: rec.seq }, (p, t) => { btn.textContent = t.length > 22 ? t.slice(0, 22) + '…' : t; });
+    URL.revokeObjectURL(rec.imgUrl);
+    Object.assign(rec, { fields: n.fields, suggested: n.suggested, conf: n.conf, flags: n.flags, boxes: n.boxes, candidates: n.candidates, lines: n.lines, rawText: n.rawText, W: n.W, H: n.H, imgUrl: n.imgUrl, rotation: n.rotation, edited: {}, ocrMs: rec.ocrMs + n.ocrMs });
+    renderReview();
+  } catch (e) { toast('Erro: ' + e.message); }
+  btn.disabled = false; btn.textContent = 'Reprocessar';
+}
+$('#btn-rot-l').addEventListener('click', () => reprocess(-90));
+$('#btn-rot-r').addEventListener('click', () => reprocess(90));
+$('#btn-reproc').addEventListener('click', () => {
+  const b = $('#set-bin'); b.checked = !b.checked; toast('Contraste ' + (b.checked ? 'ligado' : 'desligado') + ' — reprocessando…'); reprocess(0);
+});
+$('#btn-raw').addEventListener('click', () => { const r = cur(); if (!r) return; $('#raw-txt').textContent = r.rawText || '(sem texto)'; $('#dlg-raw').showModal(); });
+
+/* tempo de revisão: conta apenas com atividade nos últimos 60 s */
+['input', 'keydown', 'click', 'mousemove', 'scroll'].forEach(ev => $('#tab-review').addEventListener(ev, () => state.lastInteraction = Date.now(), { passive: true }));
+setInterval(() => {
+  const r = cur();
+  if (currentTab() === 'review' && !document.hidden && r && r.status === 'pendente' && Date.now() - state.lastInteraction < 60000) r.reviewMs += 1000;
+}, 1000);
+
+/* ============================================================
+   BASE E EXPORTAÇÃO
+   ============================================================ */
+function renderBase() {
+  refreshCounts();
+  const q = Extract.norm($('#q').value), fs = $('#f-status').value;
+  const rows = state.records.filter(r => (!fs || r.status === fs) && (!q || Extract.norm([r.fields.name, r.fields.phone, r.fields.email, r.filename].join(' ')).includes(q)));
+  $('#base-empty').hidden = rows.length > 0; $('#tbody').parentElement.hidden = rows.length === 0;
+  $('#tbody').innerHTML = rows.map(r => {
+    const dups = duplicatesOf(r);
+    return `<tr>
+      <td><b>DOC-${pad(r.seq)}</b><div class="muted" style="font-size:12px;word-break:break-all">${esc(r.filename)}</div></td>
+      <td><span class="st ${r.status}">${r.status}</span></td>
+      <td>${esc(r.fields.name) || '<span class="muted">—</span>'}${dups.length ? `<span class="dup">possível duplicado de ${dups.map(d => 'DOC-' + pad(d.seq)).join(', ')}</span>` : ''}</td>
+      <td>${esc(r.fields.phone) || '<span class="muted">—</span>'}</td>
+      <td>${esc(r.fields.email) || '<span class="muted">—</span>'}</td>
+      <td>${esc(r.fields.date) || '<span class="muted">—</span>'}</td>
+      <td>${CONSENT_LABEL[r.consent]}</td>
+      <td>${SRC_LABEL[r.sourceType]}</td>
+      <td style="white-space:nowrap">${r.status !== 'descartado' ? `<button class="btn sm" data-open="${r.id}">${r.status === 'pendente' ? 'Revisar' : 'Reabrir'}</button> ` : ''}<button class="btn sm danger" data-del="${r.id}" aria-label="Excluir DOC-${pad(r.seq)}">✕</button></td>
+    </tr>`;
+  }).join('');
+  const conf = state.records.filter(r => r.status === 'confirmado');
+  const mkt = conf.filter(isMarketable);
+  $('#cnt-all').textContent = '(' + conf.length + ')'; $('#cnt-mkt').textContent = '(' + mkt.length + ')';
+  $('#btn-exp-all').disabled = !conf.length; $('#btn-exp-mkt').disabled = !mkt.length;
+}
+const isMarketable = r => r.status === 'confirmado' && r.consent === 'sim' && (r.fields.phone || r.fields.email);
+$('#q').addEventListener('input', renderBase); $('#f-status').addEventListener('change', renderBase);
+$('#tbody').addEventListener('click', async e => {
+  const o = e.target.closest('[data-open]'); if (o) { const r = recById(o.dataset.open); if (r.status === 'confirmado') { r.status = 'pendente'; r.result = null; } openRecord(r.id); return; }
+  const d = e.target.closest('[data-del]');
+  if (d) { const r = recById(d.dataset.del); if (await confirmDialog('Excluir registro?', 'DOC-' + pad(r.seq) + ' será removido permanentemente desta sessão.', 'Excluir')) { releaseHeavy(r); state.records = state.records.filter(x => x.id !== r.id); if (state.currentId === r.id) state.currentId = null; renderBase(); } }
+});
+
+function guardCell(v) { v = String(v == null ? '' : v); if (/^[=+\-@\t\r]/.test(v)) v = "'" + v; return v; }
+function csvCell(v) { v = guardCell(v); return /[";\r\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }
+function toCSV(headers, rows) { return '﻿' + [headers.join(';')].concat(rows.map(r => r.map(csvCell).join(';'))).join('\r\n'); }
+function download(name, text) {
+  const url = URL.createObjectURL(new Blob([text], { type: 'text/csv;charset=utf-8' }));
+  const a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+const stamp = () => new Date().toISOString().slice(0, 10);
+const CSV_HEAD = ['Nome', 'Telefone', 'WhatsApp_DDI_DDD_Numero', 'Email', 'Data_Ultimo_Atendimento', 'Tipo_Origem', 'Consentimento', 'Arquivo_Origem', 'Data_Captura', 'Status'];
+function localStamp(iso) { const d = new Date(iso), p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`; }
+function csvRow(r) {
+  const p = Extract.parsePhoneText(r.fields.phone);
+  return [r.fields.name, r.fields.phone, p ? p.whatsapp : '', r.fields.email, r.fields.date, SRC_LABEL[r.sourceType], CONSENT_LABEL[r.consent], r.filename, localStamp(r.capturedAt), r.status];
+}
+/* backup automático em CSV.
+   Com "arquivo fixo" (File System Access API: Chrome/Edge) o mesmo arquivo é sobrescrito;
+   sem ele, ao zerar a fila de pendentes baixa um arquivo novo. */
+const BK = { handle: null, at: null, busy: false, again: false };
+const idbOpen = () => new Promise((res, rej) => { const r = indexedDB.open('piloto_prontuarios', 1); r.onupgradeneeded = () => r.result.createObjectStore('kv'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+const idbRun = (mode, fn) => idbOpen().then(db => new Promise((res, rej) => { const t = db.transaction('kv', mode), q = fn(t.objectStore('kv')); t.oncomplete = () => res(q && q.result); t.onerror = () => rej(t.error); }));
+const idbSet = (k, v) => idbRun('readwrite', st => st.put(v, k));
+const idbGet = k => idbRun('readonly', st => st.get(k));
+const idbDel = k => idbRun('readwrite', st => st.delete(k));
+function confirmedRows() { return state.records.filter(r => r.status === 'confirmado').map(csvRow); }
+function updateBackupText() {
+  const t = $('#backup-file-txt'), clr = $('#btn-backup-clear');
+  if (!window.showSaveFilePicker) { $('#btn-backup-file').hidden = true; clr.hidden = true; t.textContent = 'Este navegador não permite sobrescrever arquivo (use Chrome ou Edge): o backup será baixado como arquivo novo.'; return; }
+  clr.hidden = !BK.handle;
+  t.textContent = BK.handle ? 'Arquivo fixo: ' + BK.handle.name + (BK.at ? ' · atualizado às ' + BK.at.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '') : 'Sem arquivo fixo: cada backup baixa um arquivo novo.';
+}
+async function writeBackupFile() {
+  const h = BK.handle; if (!h) return false;
+  if (BK.busy) { BK.again = true; return true; }
+  BK.busy = true;
+  try {
+    let perm = h.queryPermission ? await h.queryPermission({ mode: 'readwrite' }) : 'granted';
+    if (perm !== 'granted' && h.requestPermission) perm = await h.requestPermission({ mode: 'readwrite' });   // exige gesto do usuário (clique/tecla)
+    if (perm !== 'granted') return false;
+    const rows = confirmedRows(); if (!rows.length) return true;
+    const w = await h.createWritable(); await w.write(toCSV(CSV_HEAD, rows)); await w.close();
+    BK.at = new Date(); updateBackupText(); return true;
+  } catch (e) { console.warn('backup em arquivo falhou:', e); return false; }
+  finally { BK.busy = false; if (BK.again) { BK.again = false; writeBackupFile(); } }
+}
+async function autoBackup() {
+  if (!$('#set-backup').checked) return { n: 0 };
+  const rows = confirmedRows(); if (!rows.length) return { n: 0 };
+  if (BK.handle && await writeBackupFile()) return { n: rows.length, file: BK.handle.name };
+  const d = new Date(), p2 = n => String(n).padStart(2, '0');
+  download(`backup_contatos_${stamp()}_${p2(d.getHours())}${p2(d.getMinutes())}.csv`, toCSV(CSV_HEAD, rows));
+  return { n: rows.length, download: true };
+}
+$('#btn-backup-file').addEventListener('click', async () => {
+  try {
+    const h = await window.showSaveFilePicker({ suggestedName: 'backup_contatos.csv', types: [{ description: 'Planilha CSV', accept: { 'text/csv': ['.csv'] } }] });
+    BK.handle = h; try { await idbSet('backupHandle', h); } catch (e) { }
+    const ok = await writeBackupFile();
+    toast(ok ? 'Arquivo de backup definido: ' + h.name : 'Arquivo definido: ' + h.name + ' (será gravado ao confirmar as fichas).');
+  } catch (e) { if (e.name !== 'AbortError') toast('Não foi possível usar arquivo fixo neste ambiente (' + (e.message || e.name) + ').'); }
+  updateBackupText();
+});
+$('#btn-backup-clear').addEventListener('click', async () => { BK.handle = null; BK.at = null; try { await idbDel('backupHandle'); } catch (e) { } updateBackupText(); toast('Arquivo fixo removido.'); });
+if (window.showSaveFilePicker) { idbGet('backupHandle').then(h => { if (h) BK.handle = h; updateBackupText(); }).catch(() => updateBackupText()); } else updateBackupText();
+try { if (localStorage.getItem('piloto_pref_backup') === '0') $('#set-backup').checked = false; } catch (e) { }
+$('#set-backup').addEventListener('change', e => { try { localStorage.setItem('piloto_pref_backup', e.target.checked ? '1' : '0'); } catch (x) { } });
+$('#btn-exp-all').addEventListener('click', () => {
+  const rows = state.records.filter(r => r.status === 'confirmado').map(csvRow);
+  download(`contatos_confirmados_${stamp()}.csv`, toCSV(CSV_HEAD, rows)); toast(rows.length + ' contatos exportados.');
+});
+$('#btn-exp-mkt').addEventListener('click', async () => {
+  const list = state.records.filter(isMarketable);
+  if (!await confirmDialog('Exportar lista de captação?', list.length + ' contatos com consentimento “Sim” documentado. Use apenas conforme a base legal definida pela sua organização (LGPD).', 'Exportar')) return;
+  download(`captacao_com_consentimento_${stamp()}.csv`, toCSV(CSV_HEAD, list.map(csvRow)));
+});
+
+function releaseHeavy(r) { if (r.imgUrl) { URL.revokeObjectURL(r.imgUrl); r.imgUrl = null; } r.src = null; r.rawText = ''; r.lines = []; r.boxes = { name: null, phone: null, email: null, date: null }; r.candidates = { phone: [], email: [], date: [] }; r.W = r.H = 0; }
+$('#btn-wipe-img').addEventListener('click', async () => {
+  if (!await confirmDialog('Apagar imagens e texto bruto?', 'Remove da memória todas as fotos, linhas do OCR e texto bruto. Os campos extraídos/confirmados permanecem. Não é possível reprocessar depois.', 'Apagar')) return;
+  state.records.forEach(releaseHeavy); $('#doc-img').removeAttribute('src'); $('#doc-img').dataset.rid = ''; renderBase(); toast('Imagens e texto bruto apagados.');
+});
+$('#btn-clear').addEventListener('click', async () => {
+  if (!await confirmDialog('Limpar tudo?', 'Apaga todos os registros, imagens e a sessão salva (se houver) deste navegador.', 'Limpar tudo')) return;
+  state.records.forEach(releaseHeavy); state.records = []; state.currentId = null; state.dirtyUnsaved = false;
+  try { localStorage.removeItem(STORE_KEY); } catch (e) { }
+  renderBase(); toast('Tudo apagado.');
+});
+
+/* ---------- salvamento automático criptografado ---------- */
+const STORE_KEY = 'piloto_prontuarios_sessao_v2';
+const EXPIRE_MS = 7 * 24 * 3600 * 1000;
+const b64 = u8 => btoa(String.fromCharCode(...u8)), unb64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+const Vault = { key: null, salt: null, last: '', at: null, busy: false, error: '' };
+const hasCrypto = () => !!(window.crypto && crypto.subtle);
+async function deriveKey(pass, salt) {
+  const km = await crypto.subtle.importKey('raw', new TextEncoder().encode(pass), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey({ name: 'PBKDF2', salt, iterations: 250000, hash: 'SHA-256' }, km, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+}
+function slimRecords(withTime) {
+  return state.records.map(r => { const o = { id: r.id, seq: r.seq, filename: r.filename, capturedAt: r.capturedAt, status: r.status, consent: r.consent, sourceType: r.sourceType, fields: r.fields, suggested: r.suggested, conf: r.conf, result: r.result, ocrMs: r.ocrMs, edited: r.edited }; if (withTime) o.reviewMs = r.reviewMs; return o; });
+}
+function readStore() { try { const raw = localStorage.getItem(STORE_KEY); return raw ? JSON.parse(raw) : null; } catch (e) { return null; } }
+function dropStore() { try { localStorage.removeItem(STORE_KEY); } catch (e) { } }
+function updateVaultChip() {
+  const chip = $('#vault-chip'), t = $('#vault-txt');
+  if (!hasCrypto()) { chip.className = 'engine error'; t.textContent = 'Salvamento indisponível (abra o arquivo localmente ou use https)'; return; }
+  if (Vault.error) { chip.className = 'engine error'; t.textContent = 'Salvamento com erro — exporte o CSV'; return; }
+  if (Vault.key) { chip.className = 'engine ready'; t.textContent = 'Salvamento automático · ' + (Vault.at ? 'salvo às ' + Vault.at.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : 'ligado'); }
+  else { chip.className = 'engine off'; t.textContent = 'Salvamento: desligado (clique para ativar)'; }
+}
+async function vaultSave(force) {
+  if (!Vault.key || Vault.busy) return;
+  if (!state.records.length) { dropStore(); Vault.last = ''; Vault.at = null; updateVaultChip(); return; }
+  const sig = JSON.stringify({ seq: state.seq, r: slimRecords(false) });
+  if (!force && sig === Vault.last) { state.dirtyUnsaved = false; return; }
+  Vault.busy = true;
+  try {
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const payload = new TextEncoder().encode(JSON.stringify({ savedAt: Date.now(), seq: state.seq, records: slimRecords(true) }));
+    const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, Vault.key, payload));
+    localStorage.setItem(STORE_KEY, JSON.stringify({ v: 3, savedAt: Date.now(), salt: b64(Vault.salt), iv: b64(iv), data: b64(ct) }));
+    Vault.last = sig; Vault.at = new Date(); Vault.error = ''; state.dirtyUnsaved = false;
+  } catch (e) { console.error(e); Vault.error = String(e.message || e); }
+  Vault.busy = false; updateVaultChip();
+}
+async function vaultCreate(pass) {
+  Vault.salt = crypto.getRandomValues(new Uint8Array(16)); Vault.key = await deriveKey(pass, Vault.salt); Vault.last = ''; Vault.error = '';
+  await vaultSave(true); updateVaultChip();
+}
+async function vaultUnlock(pass, box) {
+  const salt = unb64(box.salt), key = await deriveKey(pass, salt);
+  const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: unb64(box.iv) }, key, unb64(box.data));   // falha se a senha estiver errada
+  const data = JSON.parse(new TextDecoder().decode(pt));
+  const have = new Set(state.records.map(r => r.id));
+  data.records.forEach(r => { if (!have.has(r.id)) state.records.push({ ...r, boxes: {}, candidates: { phone: [], email: [], date: [] }, flags: { name: [], phone: [], email: [], date: [] }, lines: [], rawText: '', W: 0, H: 0, imgUrl: null, src: null, rotation: 0 }); });
+  state.records.sort((a, b) => b.seq - a.seq);
+  state.seq = Math.max(state.seq, data.seq || 1);
+  Vault.salt = salt; Vault.key = key; Vault.error = ''; Vault.last = JSON.stringify({ seq: state.seq, r: slimRecords(false) }); Vault.at = new Date(box.savedAt);
+  refreshCounts(); updateVaultChip();
+}
+/* diálogo de início: cria senha (nova sessão) ou desbloqueia a sessão salva */
+function vaultPrompt() {
+  return new Promise(resolve => {
+    if (!hasCrypto()) { updateVaultChip(); return resolve(false); }
+    let box = readStore();
+    if (box && Date.now() - box.savedAt > EXPIRE_MS) { dropStore(); box = null; toast('A sessão salva expirou (7 dias) e foi apagada.'); }
+    const d = $('#dlg-start'), f = $('#start-form'), p1 = $('#st-pass'), p2 = $('#st-pass2'), err = $('#st-err'), alt = $('#st-alt'), ok = $('#st-ok');
+    let mode = box ? 'unlock' : 'create', finished = false;
+    const finish = v => { if (finished) return; finished = true; d.onclose = null; if (d.open) d.close(); resolve(v); };
+    const draw = () => {
+      p1.value = p2.value = ''; err.textContent = '';
+      if (mode === 'unlock') {
+        $('#st-title').textContent = 'Sessão salva encontrada';
+        $('#st-desc').textContent = 'Digite a senha para continuar de onde parou. Só os campos foram guardados (sem imagens).';
+        p1.placeholder = 'Senha'; p2.hidden = true; alt.textContent = 'Apagar sessão salva e recomeçar'; ok.textContent = 'Desbloquear';
+      } else {
+        $('#st-title').textContent = 'Proteger esta sessão com senha';
+        $('#st-desc').textContent = 'Ativa o salvamento automático: cada alteração é gravada cifrada neste navegador (só campos, sem imagens), com expiração de 7 dias. Não há recuperação de senha — se esquecer, os dados salvos se perdem.';
+        p1.placeholder = 'Crie uma senha (mín. 6 caracteres)'; p2.hidden = false; alt.textContent = 'Continuar sem salvar'; ok.textContent = 'Ativar salvamento';
+      }
+      p1.focus();
+    };
+    f.onsubmit = async e => {
+      e.preventDefault(); err.textContent = '';
+      if (mode === 'create') {
+        if (p1.value.length < 6) { err.textContent = 'Use ao menos 6 caracteres.'; return; }
+        if (p1.value !== p2.value) { err.textContent = 'As senhas não coincidem.'; return; }
+        ok.disabled = true; try { await vaultCreate(p1.value); finish(true); toast('Salvamento automático ligado.'); } catch (x) { err.textContent = 'Erro: ' + x.message; } ok.disabled = false;
+      } else {
+        ok.disabled = true; try { await vaultUnlock(p1.value, box); finish(true); toast('Sessão carregada (' + state.records.length + ' registros).'); renderBase(); } catch (x) { err.textContent = 'Senha incorreta ou dados corrompidos.'; } ok.disabled = false;
+      }
+    };
+    alt.onclick = async () => {
+      if (mode === 'unlock') {
+        if (!await confirmDialog('Apagar a sessão salva?', 'Os campos salvos serão apagados permanentemente deste navegador.', 'Apagar e recomeçar')) { if (!d.open) d.showModal(); return; }
+        dropStore(); box = null; mode = 'create'; if (!d.open) d.showModal(); draw();
+      } else finish(false);
+    };
+    d.onclose = () => finish(false);   // Esc = continuar sem salvar (a sessão salva, se existir, não é tocada)
+    draw(); d.showModal(); p1.focus();
+  });
+}
+$('#vault-chip').addEventListener('click', async () => { if (!Vault.key && hasCrypto()) { await vaultPrompt(); updateVaultChip(); } else if (Vault.key) toast('Salvamento automático ligado' + (Vault.at ? ' — último às ' + Vault.at.toLocaleTimeString('pt-BR') : '') + '.'); });
+$('#btn-save').addEventListener('click', async () => {
+  if (!hasCrypto()) { toast('Criptografia indisponível neste contexto (abra o arquivo localmente ou use https).'); return; }
+  if (!Vault.key) { await vaultPrompt(); updateVaultChip(); return; }
+  await vaultSave(true); toast('Salvo agora.');
+});
+setInterval(() => vaultSave(false), 2000);
+document.addEventListener('visibilitychange', () => { if (document.hidden) vaultSave(false); });
+window.addEventListener('beforeunload', e => { if (state.records.length && state.dirtyUnsaved) { e.preventDefault(); e.returnValue = ''; } });
+
+/* ============================================================
+   MÉTRICAS DO PILOTO
+   ============================================================ */
+function computeMetrics() {
+  const conf = state.records.filter(r => r.status === 'confirmado' && r.result);
+  const groups = { todos: conf, impresso: conf.filter(r => r.sourceType === 'impresso'), manuscrito: conf.filter(r => r.sourceType === 'manuscrito'), misto: conf.filter(r => r.sourceType === 'misto') };
+  const calc = list => {
+    const out = { n: list.length, fields: {}, accepted: 0, final: 0, docsClean: 0 };
+    FIELDS.forEach(f => {
+      const c = { ok: 0, corrigido: 0, manual: 0, vazio: 0 };
+      list.forEach(r => c[r.result[f]]++);
+      const finals = c.ok + c.corrigido + c.manual;
+      out.fields[f] = { ...c, finals, acc: finals ? c.ok / finals : null };
+      out.accepted += c.ok; out.final += finals;
+    });
+    list.forEach(r => { const filled = FIELDS.filter(f => r.result[f] !== 'vazio'); if (r.result.name === 'ok' && filled.length && filled.every(f => r.result[f] === 'ok') && (r.result.phone === 'ok' || r.result.email === 'ok')) out.docsClean++; });
+    out.acc = out.final ? out.accepted / out.final : null;
+    out.avgReview = list.length ? list.reduce((s, r) => s + r.reviewMs, 0) / list.length / 1000 : null;
+    out.avgOcr = list.length ? list.reduce((s, r) => s + r.ocrMs, 0) / list.length / 1000 : null;
+    out.contact = list.length ? list.filter(r => r.fields.phone || r.fields.email).length / list.length : null;
+    return out;
+  };
+  const m = {}; Object.keys(groups).forEach(k => m[k] = calc(groups[k]));
+  return m;
+}
+const pct = v => v == null ? '—' : Math.round(v * 100) + '%';
+const secs = v => v == null ? '—' : (v >= 60 ? Math.floor(v / 60) + ' min ' + Math.round(v % 60) + ' s' : Math.round(v) + ' s');
+function renderMetrics() {
+  const all = state.records.length, discarded = state.records.filter(r => r.status === 'descartado').length, pend = state.records.filter(r => r.status === 'pendente').length;
+  const m = computeMetrics(), t = m.todos;
+  let verdict = '<div class="verdict no">Confirme alguns documentos na revisão para ver o resultado do piloto. Recomendado: pelo menos 20 páginas, incluindo impressas e manuscritas.</div>';
+  if (t.n >= 5) {
+    const a = t.acc, cls = a >= 0.9 ? 'ok' : a >= 0.7 ? 'mid' : 'no';
+    const txt = a >= 0.9 ? `Meta atingida: ${pct(a)} dos campos saíram corretos sem correção (meta ≥ 90%).` : a >= 0.7 ? `Abaixo da meta: ${pct(a)} dos campos sem correção (meta ≥ 90%). Teste outro tipo de OCR/pré-processamento ou limite o uso a documentos impressos.` : `Precisão baixa (${pct(a)} sem correção). O OCR local não sustenta este tipo de documento; considere alternativas (veja a análise de arquitetura).`;
+    verdict = `<div class="verdict ${cls}">${txt}${t.n < 20 ? ' <span style="font-weight:400">(amostra pequena: ' + t.n + ' documentos)</span>' : ''}</div>`;
+  }
+  const kpi = (v, tt, s) => `<div class="kpi"><div class="t">${tt}</div><div class="v">${v}</div><div class="s">${s}</div></div>`;
+  const th = ['todos', 'impresso', 'manuscrito', 'misto'];
+  const cell = (g, f) => { const x = m[g].fields[f]; return x.finals ? `${pct(x.acc)} <span class="muted">(${x.ok}/${x.finals})</span>` : '—'; };
+  $('#metrics-body').innerHTML = verdict + `
+    <div class="kpis">
+      ${kpi(all, 'Documentos', `${pend} pendentes · ${discarded} descartados`)}
+      ${kpi(t.n, 'Confirmados', 'base das métricas')}
+      ${kpi(pct(t.acc), 'Campos sem correção', 'aceitos exatamente como sugeridos')}
+      ${kpi(pct(t.n ? t.docsClean / t.n : null), 'Docs 100% sem correção', 'nome + contato corretos')}
+      ${kpi(pct(t.contact), 'Docs com contato', 'telefone ou e-mail')}
+      ${kpi(secs(t.avgReview), 'Revisão por doc', 'tempo ativo médio')}
+      ${kpi(secs(t.avgOcr), 'OCR por doc', 'tempo médio de leitura')}
+    </div>
+    <div class="tbl"><table style="min-width:640px"><thead><tr><th>Precisão por campo (sem correção)</th>${th.map(g => `<th>${g === 'todos' ? 'Todos' : SRC_LABEL[g]} (${m[g].n})</th>`).join('')}</tr></thead><tbody>
+      ${FIELDS.map(f => `<tr><td>${FIELD_LABEL[f]}</td>${th.map(g => `<td>${cell(g, f)}</td>`).join('')}</tr>`).join('')}
+      <tr><td><b>Geral</b></td>${th.map(g => `<td><b>${pct(m[g].acc)}</b></td>`).join('')}</tr>
+      <tr><td>Docs 100% sem correção</td>${th.map(g => `<td>${pct(m[g].n ? m[g].docsClean / m[g].n : null)}</td>`).join('')}</tr>
+      <tr><td>Revisão média por doc</td>${th.map(g => `<td>${secs(m[g].avgReview)}</td>`).join('')}</tr>
+    </tbody></table></div>
+    <p class="muted" style="font-size:12.5px">Como ler: “sem correção” = o valor sugerido pelo OCR foi confirmado exatamente igual. Campos digitados à mão quando o OCR não achou nada contam como erro (não entram como acerto). Nenhum dado pessoal vai para o arquivo de métricas.</p>
+    <div class="row"><button class="btn" type="button" id="btn-exp-metrics" ${t.n ? '' : 'disabled'}>Exportar métricas (CSV)</button></div>`;
+  const b = $('#btn-exp-metrics');
+  if (b) b.addEventListener('click', () => {
+    const rows = state.records.filter(r => r.status === 'confirmado' && r.result).map(r => ['DOC-' + pad(r.seq), SRC_LABEL[r.sourceType], r.result.name, r.result.phone, r.result.email, r.result.date, Math.round(r.reviewMs / 1000), Math.round(r.ocrMs / 1000)]);
+    download(`metricas_piloto_${stamp()}.csv`, toCSV(['Doc', 'Tipo_Origem', 'Nome', 'Telefone', 'Email', 'Data', 'Segundos_Revisao', 'Segundos_OCR'], rows));
+  });
+}
+
+/* ============================================================
+   INICIALIZAÇÃO
+   ============================================================ */
+refreshCounts(); updateVaultChip();
+setTimeout(() => { if (!window.NO_STARTUP_PROMPT) vaultPrompt().then(updateVaultChip); }, 250);
+if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) navigator.serviceWorker.register('sw.js').catch(() => { });
+window.__app = { state, Vault, vaultSave, Extract, Engine, showTab, renderBase, renderMetrics, toCSV, csvCell, computeMetrics, confirmCurrent };
+</script>
+</body>
+</html>
