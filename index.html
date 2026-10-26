@@ -579,15 +579,53 @@ const Extract = (() => {
     res.candidates.phone = phones;
     if (phones[0]) { const p = phones[0]; res.fields.phone = p.value; res.conf.phone = Math.round(p.conf); res.flags.phone = p.flags.slice(); res.boxes.phone = p.bbox; if (!p.label || p.label === 'sem rótulo') res.flags.phone.push('sem rótulo — conferir'); if (p.label === 'familiar') res.flags.phone.push('telefone de familiar/responsável'); if (phones.length > 1) res.flags.phone.push(`${phones.length} telefones encontrados`); }
 
-    // e-mail
+    // e-mail: tenta linhas isoladas e combina linhas adjacentes quando há sinais de quebra do endereço.
     const emails = [];
-    lines.forEach(L => emailsInText(L.text).forEach(e => {
-      if (emails.some(x => x.value === e.value)) return;
-      const conf = Math.max(0, wordsConf(L, w => w.includes('@') || /[a-z]{3,}/i.test(w)) - (e.flags.length ? 15 : 0));
-      emails.push({ value: e.value, label: e.variant ? 'variante' : '', conf, bbox: L.bbox, flags: e.flags, variant: e.variant });
+    const emailSources = lines.map(L => ({ line: L, text: L.text, joined: false }));
+    for (let i = 0; i < lines.length - 1; i++) {
+      const a = String(lines[i].text || '').trim();
+      const b = String(lines[i + 1].text || '').trim();
+      const labelInA = /e[-_\\s]?\\s?mail/i.test(a);
+      const looksSplit = labelInA || /[@©®&]\\s*$/.test(a) || /^@/.test(b) ||
+        (/[&©®Qq]\\s*$/.test(a) && /[A-Za-z0-9.-]+\\.[A-Za-z]{2,}/.test(b));
+      if (!looksSplit || !a || !b) continue;
+      const labelOnly = /e[-_\\s]?\\s?mail\\s*[:;.\\-]?\\s*$/.test(a);
+      const separator = labelOnly ? ' ' : '';
+      emailSources.push({ line: lines[i], text: a + separator + b, joined: true });
+    }
+    emailSources.forEach(src => emailsInText(src.text).forEach(e => {
+      const value = e.value.toLowerCase();
+      const existing = emails.find(x => x.value === value);
+      const conf = Math.max(0, wordsConf(src.line, w => w.includes('@') || /[a-z]{3,}/i.test(w)) - ((e.flags.length || src.joined) ? 15 : 0));
+      const flags = e.flags.slice();
+      if (src.joined && !flags.includes('e-mail unido de linhas OCR — conferir')) flags.push('e-mail unido de linhas OCR — conferir');
+      if (existing) {
+        if (conf > existing.conf) {
+          existing.conf = conf;
+          existing.bbox = src.line.bbox;
+          existing.flags = flags;
+          existing.label = e.variant ? 'variante' : (/e[-_\\s]?\\s?mail/i.test(src.text) ? 'rótulo e-mail' : '');
+        }
+        return;
+      }
+      emails.push({
+        value, label: e.variant ? 'variante' : (/e[-_\\s]?\\s?mail/i.test(src.text) ? 'rótulo e-mail' : ''),
+        conf, bbox: src.line.bbox, flags, variant: e.variant,
+        _priority: (/e[-_\\s]?\\s?mail/i.test(src.text) ? 100 : 0) + conf
+      });
     }));
+    emails.sort((a, b) => b._priority - a._priority);
+    emails.forEach(e => { delete e._priority; });
     res.candidates.email = emails;
-    if (emails[0]) { const e = emails[0]; res.fields.email = e.value; res.conf.email = Math.round(e.conf); res.flags.email = e.flags.slice(); res.boxes.email = e.bbox; const nEm = emails.filter(x => !x.variant).length; if (nEm > 1) res.flags.email.push(`${nEm} e-mails encontrados`); }
+    if (emails[0]) {
+      const e = emails[0];
+      res.fields.email = e.value;
+      res.conf.email = Math.round(e.conf);
+      res.flags.email = e.flags.slice();
+      res.boxes.email = e.bbox;
+      const nEm = emails.filter(x => !x.variant).length;
+      if (nEm > 1) res.flags.email.push(`${nEm} e-mails encontrados`);
+    }
 
     // data
     const dates = [];
@@ -1318,8 +1356,14 @@ function renderMetrics() {
     <div class="row"><button class="btn" type="button" id="btn-exp-metrics" ${t.n ? '' : 'disabled'}>Exportar métricas (CSV)</button></div>`;
   const b = $('#btn-exp-metrics');
   if (b) b.addEventListener('click', () => {
-    const rows = state.records.filter(r => r.status === 'confirmado' && r.result).map(r => ['DOC-' + pad(r.seq), SRC_LABEL[r.sourceType], r.result.name, r.result.phone, r.result.email, r.result.date, Math.round(r.reviewMs / 1000), Math.round(r.ocrMs / 1000)]);
-    download(`metricas_piloto_${stamp()}.csv`, toCSV(['Doc', 'Tipo_Origem', 'Nome', 'Telefone', 'Email', 'Data', 'Segundos_Revisao', 'Segundos_OCR'], rows));
+    // Métricas operacionais: não exportar campos pessoais dos prontuários.
+    const rows = state.records.filter(r => r.status === 'confirmado' && r.result).map(r => [
+      'DOC-' + pad(r.seq),
+      SRC_LABEL[r.sourceType],
+      Math.round((r.reviewMs || 0) / 1000),
+      Math.round((r.ocrMs || 0) / 1000)
+    ]);
+    download(`metricas_piloto_${stamp()}.csv`, toCSV(['Doc', 'Tipo_Origem', 'Segundos_Revisao', 'Segundos_OCR'], rows));
   });
 }
 
