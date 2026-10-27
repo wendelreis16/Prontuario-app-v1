@@ -1,12 +1,58 @@
-/* Service worker: guarda o app e o motor OCR para uso offline após a 1ª visita.
-   Ao publicar uma versão nova do index.html, aumente VERSION. */
-const VERSION = 'v1';
+/* Service worker do Piloto Prontuários.
+   Cacheia apenas recursos que existem no repositório.
+   O OCR ainda é carregado do CDN nesta branch e, por isso, exige internet. */
+const VERSION = 'v2';
 const CACHE = 'piloto-prontuarios-' + VERSION;
-const FILES = ['./', 'index.html', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png',
-  'ocr/tesseract.min.js', 'ocr/worker.min.js', 'ocr/core/tesseract-core-lstm.wasm.js', 'ocr/core/tesseract-core-simd-lstm.wasm.js', 'ocr/lang/por.traineddata.gz'];
-self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting())); });
-self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())); });
-self.addEventListener('fetch', e => {
-  if (e.request.method !== 'GET' || new URL(e.request.url).origin !== location.origin) return;
-  e.respondWith(caches.match(e.request, { ignoreSearch: true }).then(hit => hit || fetch(e.request)));
+const APP_SHELL = [
+  './',
+  './index.html',
+  './manifest.webmanifest',
+  './icons/icon-192.svg',
+  './icons/icon-512.svg'
+];
+
+self.addEventListener('install', event => {
+  event.waitUntil(
+    caches.open(CACHE)
+      .then(cache => cache.addAll(APP_SHELL))
+      .then(() => self.skipWaiting())
+  );
+});
+
+self.addEventListener('activate', event => {
+  event.waitUntil(
+    caches.keys()
+      .then(keys => Promise.all(keys
+        .filter(key => key.startsWith('piloto-prontuarios-') && key !== CACHE)
+        .map(key => caches.delete(key))))
+      .then(() => self.clients.claim())
+  );
+});
+
+self.addEventListener('fetch', event => {
+  const request = event.request;
+  if (request.method !== 'GET') return;
+
+  const url = new URL(request.url);
+  if (url.origin !== self.location.origin) return;
+
+  event.respondWith((async () => {
+    const cache = await caches.open(CACHE);
+    const cached = await cache.match(request, { ignoreSearch: true });
+    if (cached) return cached;
+
+    try {
+      const response = await fetch(request);
+      if (response && response.ok && response.type === 'basic') {
+        await cache.put(request, response.clone());
+      }
+      return response;
+    } catch (error) {
+      if (request.mode === 'navigate') {
+        const shell = await cache.match('./index.html');
+        if (shell) return shell;
+      }
+      throw error;
+    }
+  })());
 });
